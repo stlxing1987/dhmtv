@@ -37,6 +37,8 @@ public class ApiHistoryDialogAdapter extends ListAdapter<String, ApiHistoryDialo
 
     private String select = "";
 
+    private boolean allowReselect = false;
+
     private SelectDialogInterface dialogInterface = null;
 
     public ApiHistoryDialogAdapter(SelectDialogInterface dialogInterface) {
@@ -54,10 +56,22 @@ public class ApiHistoryDialogAdapter extends ListAdapter<String, ApiHistoryDialo
         this.dialogInterface = dialogInterface;
     }
 
+    public void setAllowReselect(boolean allowReselect) {
+        this.allowReselect = allowReselect;
+    }
+
     public void setData(List<String> newData, int defaultSelect) {
         data.clear();
-        data.addAll(newData);
-        select = data.get(defaultSelect);
+        if (newData != null) {
+            data.addAll(newData);
+        }
+        if (data.isEmpty()) {
+            select = "";
+            notifyDataSetChanged();
+            return;
+        }
+        int index = Math.max(0, Math.min(defaultSelect, data.size() - 1));
+        select = data.get(index);
         notifyDataSetChanged();
     }
 
@@ -82,11 +96,17 @@ public class ApiHistoryDialogAdapter extends ListAdapter<String, ApiHistoryDialo
         holder.itemView.findViewById(R.id.tvName).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (select.equals(value))
+                if (select.equals(value) && !allowReselect) {
                     return;
-                notifyItemChanged(data.indexOf(select));
-                select = value;
-                notifyItemChanged(data.indexOf(value));
+                }
+                if (!select.equals(value)) {
+                    int oldIndex = data.indexOf(select);
+                    select = value;
+                    if (oldIndex >= 0) {
+                        notifyItemChanged(oldIndex);
+                    }
+                    notifyItemChanged(position);
+                }
                 dialogInterface.click(value);
             }
         });

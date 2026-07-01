@@ -358,7 +358,7 @@ public class ApiConfig {
             }
             ApiHistoryDialog dialog = new ApiHistoryDialog(host);
             dialog.setTip("请选择配置线路");
-            dialog.setAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
+            ApiHistoryDialogAdapter adapter = new ApiHistoryDialogAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
                 @Override
                 public void click(String value) {
                     int idx = names.indexOf(value);
@@ -372,7 +372,9 @@ public class ApiConfig {
                 @Override
                 public void del(String value, ArrayList<String> data) {
                 }
-            }, names, 0);
+            });
+            adapter.setAllowReselect(true);
+            dialog.setAdapter(adapter, names, 0);
             dialog.show();
         });
     }

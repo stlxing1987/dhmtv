@@ -4,10 +4,13 @@ import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.widget.Toast;
 
 import com.github.tvbox.osc.api.ApiConfig;
+import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.base.BaseActivity;
 import com.github.tvbox.osc.ui.activity.HomeActivity;
 import com.github.tvbox.osc.ui.adapter.ApiHistoryDialogAdapter;
@@ -70,7 +73,7 @@ public class ConfigDialogHelper {
         }
         ApiHistoryDialog dialog = new ApiHistoryDialog(activity);
         dialog.setTip("请选择配置线路");
-        dialog.setAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
+        ApiHistoryDialogAdapter adapter = new ApiHistoryDialogAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
             @Override
             public void click(String value) {
                 int idx = names.indexOf(value);
@@ -87,20 +90,21 @@ public class ConfigDialogHelper {
             @Override
             public void del(String value, ArrayList<String> data) {
             }
-        }, names, defaultPos);
+        });
+        adapter.setAllowReselect(true);
+        dialog.setAdapter(adapter, names, defaultPos);
         dialog.setOnDismissListener(dialogInterface -> activity.hideSysBar());
         dialog.show();
     }
 
     public static void restartApp(Activity activity, boolean useCache) {
-        Intent intent = new Intent(activity.getApplicationContext(), HomeActivity.class);
+        Intent intent = new Intent(App.getInstance(), HomeActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         if (useCache) {
             Bundle bundle = new Bundle();
             bundle.putBoolean("useCache", true);
             intent.putExtras(bundle);
         }
-        activity.getApplicationContext().startActivity(intent);
-        AppManager.getInstance().finishAllActivity();
+        new Handler(Looper.getMainLooper()).postDelayed(() -> App.getInstance().startActivity(intent), 200);
     }
 }
