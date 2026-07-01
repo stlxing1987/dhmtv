@@ -122,7 +122,7 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
         }
     }
 
-    protected void showSuccess() {
+    public void showSuccess() {
         if (null != mLoadService) {
             mLoadService.showSuccess();
         }

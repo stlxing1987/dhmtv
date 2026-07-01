@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.api;
 
 import android.app.Activity;
+import android.os.Build;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,9 +25,9 @@ import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.MD5;
 import com.github.tvbox.osc.util.SettingUiHelper;
+import com.github.tvbox.osc.base.BaseActivity;
 import com.github.tvbox.osc.ui.activity.HomeActivity;
 import com.github.tvbox.osc.util.AppManager;
-import com.github.tvbox.osc.util.StoreConfigHelper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -37,6 +38,8 @@ import com.lzy.okgo.model.Response;
 import com.orhanobut.hawk.Hawk;
 
 import org.json.JSONObject;
+
+import com.github.tvbox.osc.util.StoreConfigHelper;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -71,7 +74,15 @@ public class ApiConfig {
     private SourceBean emptyHome = new SourceBean();
 
     private JarLoader jarLoader = new JarLoader();
+    private int loadGeneration = 0;
 
+    public void cancelPendingLoad() {
+        loadGeneration++;
+    }
+
+    private boolean isLoadStale(int generation) {
+        return generation != loadGeneration;
+    }
 
     private ApiConfig() {
         sourceBeanList = new LinkedHashMap<>();
@@ -97,6 +108,7 @@ public class ApiConfig {
     }
 
     public void loadConfig(boolean useCache, LoadConfigCallback callback, Activity activity) {
+        final int generation = ++loadGeneration;
         String apiUrl = Hawk.get(HawkConfig.API_URL, "");
         if (apiUrl.isEmpty()) {
             callback.error("-1");
@@ -105,7 +117,7 @@ public class ApiConfig {
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(apiUrl));
         if (useCache && cache.exists() && SettingUiHelper.isConfigCacheValid(cache)) {
             try {
-                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity);
+                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity, generation);
                 return;
             } catch (Throwable th) {
                 th.printStackTrace();
@@ -119,6 +131,9 @@ public class ApiConfig {
                 .execute(new AbsCallback<String>() {
                     @Override
                     public void onSuccess(Response<String> response) {
+                        if (isLoadStale(generation)) {
+                            return;
+                        }
                         try {
                             String json = response.body();
                             try {
@@ -134,19 +149,24 @@ public class ApiConfig {
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
-                            handleConfigJson(apiUrl, json, useCache, callback, activity);
+                            handleConfigJson(apiUrl, json, useCache, callback, activity, generation);
                         } catch (Throwable th) {
                             th.printStackTrace();
-                            callback.error("解析配置失败");
+                            if (!isLoadStale(generation)) {
+                                callback.error("解析配置失败");
+                            }
                         }
                     }
 
                     @Override
                     public void onError(Response<String> response) {
                         super.onError(response);
+                        if (isLoadStale(generation)) {
+                            return;
+                        }
                         if (cache.exists()) {
                             try {
-                                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity);
+                                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity, generation);
                                 return;
                             } catch (Throwable th) {
                                 th.printStackTrace();
@@ -243,7 +263,10 @@ public class ApiConfig {
         return !parseUrlIndex(infoJson).isEmpty();
     }
 
-    private void handleConfigJson(String apiUrl, String jsonStr, boolean useCache, LoadConfigCallback callback, Activity activity) {
+    private void handleConfigJson(String apiUrl, String jsonStr, boolean useCache, LoadConfigCallback callback, Activity activity, int generation) {
+        if (isLoadStale(generation)) {
+            return;
+        }
         jsonStr = normalizeJson(jsonStr);
         JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
         if (isUrlIndex(infoJson)) {
@@ -251,7 +274,7 @@ public class ApiConfig {
             cacheUrlIndex(apiUrl, items);
             UrlIndexItem selected = resolveUrlIndexItem(items);
             if (selected == null) {
-                showUrlIndexDialog(activity, items, useCache, callback);
+                showUrlIndexDialog(activity, items, useCache, callback, generation);
                 return;
             }
             applyUrlIndexSelection(selected);
@@ -260,7 +283,9 @@ public class ApiConfig {
         }
         urlIndexList.clear();
         parseJson(apiUrl, infoJson);
-        callback.success();
+        if (!isLoadStale(generation)) {
+            callback.success();
+        }
     }
 
     private void cacheUrlIndex(String indexUrl, List<UrlIndexItem> items) {
@@ -332,7 +357,10 @@ public class ApiConfig {
         applyUrlIndexSelection(item);
     }
 
-    private void showUrlIndexDialog(Activity activity, List<UrlIndexItem> items, boolean useCache, LoadConfigCallback callback) {
+    private void showUrlIndexDialog(Activity activity, List<UrlIndexItem> items, boolean useCache, LoadConfigCallback callback, int generation) {
+        if (isLoadStale(generation)) {
+            return;
+        }
         if (items.isEmpty()) {
             postCallbackError(callback, "配置线路为空");
             return;
@@ -347,36 +375,59 @@ public class ApiConfig {
             postCallbackError(callback, "配置线路为空");
             return;
         }
-        host.runOnUiThread(() -> {
-            if (host.isFinishing()) {
+        ArrayList<String> names = new ArrayList<>();
+        for (UrlIndexItem item : items) {
+            names.add(item.name);
+        }
+        Runnable showDialogTask = () -> {
+            if (isLoadStale(generation) || !isActivityAlive(host)) {
                 postCallbackError(callback, "配置线路为空");
                 return;
             }
-            ArrayList<String> names = new ArrayList<>();
-            for (UrlIndexItem item : items) {
-                names.add(item.name);
-            }
-            ApiHistoryDialog dialog = new ApiHistoryDialog(host);
-            dialog.setTip("请选择配置线路");
-            ApiHistoryDialogAdapter adapter = new ApiHistoryDialogAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
-                @Override
-                public void click(String value) {
-                    int idx = names.indexOf(value);
-                    if (idx >= 0) {
-                        applyUrlIndexSelection(items.get(idx));
-                        dialog.dismiss();
-                        loadConfig(useCache, callback, host);
+            try {
+                if (host instanceof BaseActivity) {
+                    ((BaseActivity) host).showSuccess();
+                }
+                ApiHistoryDialog dialog = new ApiHistoryDialog(host);
+                dialog.setTip("请选择配置线路");
+                ApiHistoryDialogAdapter adapter = new ApiHistoryDialogAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
+                    @Override
+                    public void click(String value) {
+                        int idx = names.indexOf(value);
+                        if (idx >= 0) {
+                            applyUrlIndexSelection(items.get(idx));
+                            dialog.dismiss();
+                            loadConfig(useCache, callback, host);
+                        }
                     }
-                }
 
-                @Override
-                public void del(String value, ArrayList<String> data) {
-                }
-            });
-            adapter.setAllowReselect(true);
-            dialog.setAdapter(adapter, names, 0);
-            dialog.show();
-        });
+                    @Override
+                    public void del(String value, ArrayList<String> data) {
+                    }
+                });
+                adapter.setAllowReselect(true);
+                dialog.setAdapter(adapter, names, 0);
+                dialog.show();
+            } catch (Throwable th) {
+                th.printStackTrace();
+                postCallbackError(callback, "无法显示线路选择");
+            }
+        };
+        if (host instanceof HomeActivity) {
+            ((HomeActivity) host).runAfterLoading(showDialogTask);
+        } else {
+            host.runOnUiThread(showDialogTask);
+        }
+    }
+
+    private boolean isActivityAlive(Activity activity) {
+        if (activity == null || activity.isFinishing()) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed()) {
+            return false;
+        }
+        return true;
     }
 
     private Activity resolveDialogActivity(Activity activity) {

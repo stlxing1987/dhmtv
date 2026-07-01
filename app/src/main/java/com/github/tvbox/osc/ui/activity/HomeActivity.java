@@ -98,6 +98,27 @@ public class HomeActivity extends BaseActivity {
 
     boolean useCacheConfig = false;
 
+    public void reloadConfig(boolean useCache) {
+        useCacheConfig = useCache;
+        dataInitOk = false;
+        jarInitOk = false;
+        homeSourceFallbackTried = false;
+        ApiConfig.get().cancelPendingLoad();
+        mHandler.post(this::initData);
+    }
+
+    public void runAfterLoading(Runnable task) {
+        runOnUiThread(() -> {
+            showSuccess();
+            View decorView = getWindow() != null ? getWindow().getDecorView() : null;
+            if (decorView != null) {
+                decorView.postDelayed(task, 150);
+            } else {
+                mHandler.postDelayed(task, 150);
+            }
+        });
+    }
+
     @Override
     protected void init() {
         getWindow().setBackgroundDrawableResource(SettingUiHelper.WALLPAPER_RES[SettingUiHelper.getWallpaperIndex()]);

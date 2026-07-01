@@ -43,7 +43,7 @@ public class ConfigDialogHelper {
                 callback.onStoreChanged();
             }
             if (!TextUtils.equals(oldUrl, newUrl) || !TextUtils.equals(oldIndex, newIndex)) {
-                restartApp(activity, false);
+                reloadConfig(activity, false);
             }
         });
         dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -83,7 +83,7 @@ public class ConfigDialogHelper {
                     if (callback != null) {
                         callback.onLineChanged();
                     }
-                    restartApp(activity, true);
+                    reloadConfig(activity, true);
                 }
             }
 
@@ -97,7 +97,28 @@ public class ConfigDialogHelper {
         dialog.show();
     }
 
+    public static void reloadConfig(BaseActivity activity, boolean useCache) {
+        HomeActivity home = findHomeActivity(activity);
+        if (home != null) {
+            home.reloadConfig(useCache);
+            return;
+        }
+        restartApp(activity, useCache);
+    }
+
+    private static HomeActivity findHomeActivity(BaseActivity activity) {
+        if (activity instanceof HomeActivity && !activity.isFinishing()) {
+            return (HomeActivity) activity;
+        }
+        Activity found = AppManager.getInstance().getActivity(HomeActivity.class);
+        if (found instanceof HomeActivity && !found.isFinishing()) {
+            return (HomeActivity) found;
+        }
+        return null;
+    }
+
     public static void restartApp(Activity activity, boolean useCache) {
+        ApiConfig.get().cancelPendingLoad();
         Intent intent = new Intent(App.getInstance(), HomeActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         if (useCache) {
