@@ -3,7 +3,7 @@ function search() {
 }
 
 function api() {
-    doAction('api', { url: $('#diy_api_url').val() });
+    doAction('api', { name: $('#diy_api_name').val(), url: $('#diy_api_url').val() });
 }
 
 function push() {
@@ -12,10 +12,14 @@ function push() {
 
 function doAction(action, kv) {
     kv['do'] = action;
-    // alert(JSON.stringify(kv));
     $.post('/action', kv, function (data) {
-        console.log(data);
-        // alert(data);
+        if (action === 'api') {
+            warnToast('已推送到电视');
+        } else if (action === 'search') {
+            warnToast('搜索已发送');
+        } else if (action === 'push') {
+            warnToast('推送已发送');
+        }
     });
     return false;
 }
@@ -194,22 +198,6 @@ function doNewFolder(yes) {
     }
 }
 
-
-function delFolder() {
-    $('#delFolderContent').html('是否删除 ' + current_root);
-    $('#delFolder').show();
-}
-
-function doDelFolder(yes) {
-    $('#delFolder').hide();
-    if (yes == 1) {
-        $('#loadingToast').show();
-        $.post('/delFolder', { path: current_root }, function (data) {
-            $('#loadingToast').hide();
-            listFile(current_parent);
-        });
-    }
-}
 
 function delFolder() {
     $('#delFolderContent').html('是否删除 ' + current_root);

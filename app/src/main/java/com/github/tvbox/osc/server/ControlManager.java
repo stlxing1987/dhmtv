@@ -6,9 +6,11 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 
+import com.github.tvbox.osc.bean.StoreBean;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.receiver.SearchReceiver;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.StoreConfigHelper;
 import com.orhanobut.hawk.Hawk;
 
 import org.greenrobot.eventbus.EventBus;
@@ -72,8 +74,17 @@ public class ControlManager {
                 }
 
                 @Override
-                public void onApiReceived(String url) {
-                    EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_API_URL_CHANGE, url));
+                public void onApiReceived(String name, String url) {
+                    if (TextUtils.isEmpty(url)) {
+                        return;
+                    }
+                    String storeName = TextUtils.isEmpty(name) ? StoreConfigHelper.buildDefaultName(url) : name;
+                    StoreConfigHelper.addOrUpdateStore(storeName, url);
+                    StoreBean store = StoreConfigHelper.findByUrl(StoreConfigHelper.getStoreList(), url);
+                    if (store == null) {
+                        store = new StoreBean(storeName, url);
+                    }
+                    EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_API_URL_CHANGE, store));
                 }
 
                 @Override

@@ -6,11 +6,13 @@ import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.bean.VodInfo;
 import com.github.tvbox.osc.data.AppDataManager;
+import com.github.tvbox.osc.util.HawkConfig;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.orhanobut.hawk.Hawk;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +55,21 @@ public class RoomDataManger {
         record.updateTime = System.currentTimeMillis();
         record.dataJson = getVodInfoGson().toJson(vodInfo);
         AppDataManager.get().getVodRecordDao().insert(record);
+        trimVodRecordsIfNeeded();
+    }
+
+    private static void trimVodRecordsIfNeeded() {
+        int max = Hawk.get(HawkConfig.HISTORY_COUNT, 30);
+        if (max <= 0) {
+            return;
+        }
+        List<VodRecord> records = AppDataManager.get().getVodRecordDao().getAll(max + 200);
+        if (records == null || records.size() <= max) {
+            return;
+        }
+        for (int i = max; i < records.size(); i++) {
+            AppDataManager.get().getVodRecordDao().delete(records.get(i));
+        }
     }
 
     public static VodInfo getVodInfo(String sourceKey, String vodId) {

@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.util;
 
 import android.content.Context;
+import android.os.Build;
 
 import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.bean.IJKCode;
@@ -20,13 +21,60 @@ import xyz.doikki.videoplayer.render.RenderViewFactory;
 import xyz.doikki.videoplayer.render.TextureRenderViewFactory;
 
 public class PlayerHelper {
+    private static Boolean ijkAvailable;
+
+    /** x86/x86_64 模拟器无可用 IJK 原生库 */
+    public static boolean isX86Device() {
+        if (Build.SUPPORTED_ABIS == null || Build.SUPPORTED_ABIS.length == 0) {
+            return false;
+        }
+        String abi = Build.SUPPORTED_ABIS[0].toLowerCase();
+        return abi.contains("x86");
+    }
+
+    public static boolean isIjkAvailable() {
+        if (ijkAvailable != null) {
+            return ijkAvailable;
+        }
+        if (isX86Device()) {
+            ijkAvailable = false;
+            return false;
+        }
+        try {
+            System.loadLibrary("player");
+            ijkAvailable = true;
+        } catch (Throwable t) {
+            ijkAvailable = false;
+        }
+        return ijkAvailable;
+    }
+
+    public static int resolvePlayType(int playType) {
+        if (playType == 1 && !isIjkAvailable()) {
+            return 2;
+        }
+        return playType;
+    }
+
+    public static boolean fallbackToExo(VideoView videoView, JSONObject playerCfg) {
+        try {
+            playerCfg.put("pl", 2);
+            Hawk.put(HawkConfig.PLAY_TYPE, 2);
+            updateCfg(videoView, playerCfg);
+            return true;
+        } catch (Throwable t) {
+            t.printStackTrace();
+            return false;
+        }
+    }
+
     public static void updateCfg(VideoView videoView, JSONObject playerCfg) {
-        int playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0);
+        int playerType = resolvePlayType(Hawk.get(HawkConfig.PLAY_TYPE, 0));
         int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
         String ijkCode = Hawk.get(HawkConfig.IJK_CODEC, "软解码");
         int scale = Hawk.get(HawkConfig.PLAY_SCALE, 0);
         try {
-            playerType = playerCfg.getInt("pl");
+            playerType = resolvePlayType(playerCfg.getInt("pl"));
             renderType = playerCfg.getInt("pr");
             ijkCode = playerCfg.getString("ijk");
             scale = playerCfg.getInt("sc");
@@ -77,7 +125,7 @@ public class PlayerHelper {
     }
 
     public static void updateCfg(VideoView videoView) {
-        int playType = Hawk.get(HawkConfig.PLAY_TYPE, 0);
+        int playType = resolvePlayType(Hawk.get(HawkConfig.PLAY_TYPE, 0));
         PlayerFactory playerFactory;
         if (playType == 1) {
             playerFactory = new PlayerFactory<IjkMediaPlayer>() {

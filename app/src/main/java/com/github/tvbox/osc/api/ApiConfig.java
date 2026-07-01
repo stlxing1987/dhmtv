@@ -2,6 +2,8 @@ package com.github.tvbox.osc.api;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Base64;
 
@@ -11,13 +13,20 @@ import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.LiveChannelGroup;
 import com.github.tvbox.osc.bean.IJKCode;
 import com.github.tvbox.osc.bean.LiveChannelItem;
+import com.github.tvbox.osc.bean.LiveSourceBean;
 import com.github.tvbox.osc.bean.ParseBean;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.server.ControlManager;
+import com.github.tvbox.osc.ui.adapter.ApiHistoryDialogAdapter;
+import com.github.tvbox.osc.ui.dialog.ApiHistoryDialog;
 import com.github.tvbox.osc.util.AdBlocker;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.MD5;
+import com.github.tvbox.osc.util.SettingUiHelper;
+import com.github.tvbox.osc.ui.activity.HomeActivity;
+import com.github.tvbox.osc.util.AppManager;
+import com.github.tvbox.osc.util.StoreConfigHelper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -51,10 +60,13 @@ public class ApiConfig {
     private SourceBean mHomeSource;
     private ParseBean mDefaultParse;
     private List<LiveChannelGroup> liveChannelGroupList;
+    private List<LiveSourceBean> liveSourceList;
+    private List<LiveChannelGroup> inlineLiveCache;
     private List<ParseBean> parseBeanList;
     private List<String> vipParseFlags;
     private List<IJKCode> ijkCodes;
     private String spider = null;
+    private List<UrlIndexItem> urlIndexList = new ArrayList<>();
 
     private SourceBean emptyHome = new SourceBean();
 
@@ -64,6 +76,8 @@ public class ApiConfig {
     private ApiConfig() {
         sourceBeanList = new LinkedHashMap<>();
         liveChannelGroupList = new ArrayList<>();
+        liveSourceList = new ArrayList<>();
+        inlineLiveCache = new ArrayList<>();
         parseBeanList = new ArrayList<>();
     }
 
@@ -78,6 +92,10 @@ public class ApiConfig {
         return instance;
     }
 
+    public void loadConfig(boolean useCache, LoadConfigCallback callback) {
+        loadConfig(useCache, callback, null);
+    }
+
     public void loadConfig(boolean useCache, LoadConfigCallback callback, Activity activity) {
         String apiUrl = Hawk.get(HawkConfig.API_URL, "");
         if (apiUrl.isEmpty()) {
@@ -85,10 +103,9 @@ public class ApiConfig {
             return;
         }
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(apiUrl));
-        if (useCache && cache.exists()) {
+        if (useCache && cache.exists() && SettingUiHelper.isConfigCacheValid(cache)) {
             try {
-                parseJson(apiUrl, cache);
-                callback.success();
+                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity);
                 return;
             } catch (Throwable th) {
                 th.printStackTrace();
@@ -104,7 +121,6 @@ public class ApiConfig {
                     public void onSuccess(Response<String> response) {
                         try {
                             String json = response.body();
-                            parseJson(apiUrl, response.body());
                             try {
                                 File cacheDir = cache.getParentFile();
                                 if (!cacheDir.exists())
@@ -118,7 +134,7 @@ public class ApiConfig {
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
-                            callback.success();
+                            handleConfigJson(apiUrl, json, useCache, callback, activity);
                         } catch (Throwable th) {
                             th.printStackTrace();
                             callback.error("解析配置失败");
@@ -130,8 +146,7 @@ public class ApiConfig {
                         super.onError(response);
                         if (cache.exists()) {
                             try {
-                                parseJson(apiUrl, cache);
-                                callback.success();
+                                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity);
                                 return;
                             } catch (Throwable th) {
                                 th.printStackTrace();
@@ -153,6 +168,233 @@ public class ApiConfig {
                         return result;
                     }
                 });
+    }
+
+    private String readCache(File cache) throws Throwable {
+        BufferedReader bReader = new BufferedReader(new InputStreamReader(new FileInputStream(cache), "UTF-8"));
+        StringBuilder sb = new StringBuilder();
+        String s;
+        while ((s = bReader.readLine()) != null) {
+            sb.append(s).append("\n");
+        }
+        bReader.close();
+        return sb.toString();
+    }
+
+    private String normalizeJson(String jsonStr) {
+        if (jsonStr == null) {
+            return "";
+        }
+        String json = jsonStr;
+        if (json.startsWith("\uFEFF")) {
+            json = json.substring(1);
+        }
+        return json.replace('\u201c', '"')
+                .replace('\u201d', '"')
+                .replace('\u2018', '\'')
+                .replace('\u2019', '\'');
+    }
+
+    private JsonArray safeJsonArray(JsonObject obj, String key) {
+        try {
+            if (obj.has(key) && obj.get(key).isJsonArray()) {
+                return obj.getAsJsonArray(key);
+            }
+        } catch (Throwable ignored) {
+        }
+        return new JsonArray();
+    }
+
+    private List<UrlIndexItem> parseUrlIndex(JsonObject infoJson) {
+        List<UrlIndexItem> list = new ArrayList<>();
+        JsonArray arr = null;
+        if (infoJson.has("urls")) {
+            arr = safeJsonArray(infoJson, "urls");
+        } else if (infoJson.has("storeHouse")) {
+            arr = safeJsonArray(infoJson, "storeHouse");
+        }
+        if (arr == null) {
+            return list;
+        }
+        for (JsonElement el : arr) {
+            try {
+                JsonObject obj = el.getAsJsonObject();
+                String url = DefaultConfig.safeJsonString(obj, "url", "");
+                if (url.isEmpty()) {
+                    url = DefaultConfig.safeJsonString(obj, "uri", "");
+                }
+                String name = DefaultConfig.safeJsonString(obj, "name", url);
+                if (!url.isEmpty()) {
+                    UrlIndexItem item = new UrlIndexItem();
+                    item.name = name;
+                    item.url = url;
+                    list.add(item);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return list;
+    }
+
+    private boolean isUrlIndex(JsonObject infoJson) {
+        if (safeJsonArray(infoJson, "sites").size() > 0) {
+            return false;
+        }
+        return !parseUrlIndex(infoJson).isEmpty();
+    }
+
+    private void handleConfigJson(String apiUrl, String jsonStr, boolean useCache, LoadConfigCallback callback, Activity activity) {
+        jsonStr = normalizeJson(jsonStr);
+        JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
+        if (isUrlIndex(infoJson)) {
+            List<UrlIndexItem> items = parseUrlIndex(infoJson);
+            cacheUrlIndex(apiUrl, items);
+            UrlIndexItem selected = resolveUrlIndexItem(items);
+            if (selected == null) {
+                showUrlIndexDialog(activity, items, useCache, callback);
+                return;
+            }
+            applyUrlIndexSelection(selected);
+            loadConfig(useCache, callback, activity);
+            return;
+        }
+        urlIndexList.clear();
+        parseJson(apiUrl, infoJson);
+        callback.success();
+    }
+
+    private void cacheUrlIndex(String indexUrl, List<UrlIndexItem> items) {
+        urlIndexList = new ArrayList<>(items);
+        Hawk.put(HawkConfig.API_INDEX_URL, indexUrl);
+        Hawk.put(HawkConfig.API_LINE_LIST, StoreConfigHelper.serializeLines(items));
+    }
+
+    private UrlIndexItem resolveUrlIndexItem(List<UrlIndexItem> items) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        if (items.size() == 1) {
+            return items.get(0);
+        }
+        String currentApi = Hawk.get(HawkConfig.API_URL, "");
+        for (UrlIndexItem item : items) {
+            if (currentApi.equals(item.url)) {
+                return item;
+            }
+        }
+        String savedLine = Hawk.get(HawkConfig.API_LINE_NAME, "");
+        if (!TextUtils.isEmpty(savedLine)) {
+            for (UrlIndexItem item : items) {
+                if (savedLine.equals(item.name)) {
+                    return item;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void applyUrlIndexSelection(UrlIndexItem item) {
+        Hawk.put(HawkConfig.API_URL, item.url);
+        Hawk.put(HawkConfig.API_LINE_NAME, item.name);
+    }
+
+    public List<UrlIndexItem> getUrlIndexList() {
+        if (urlIndexList != null && !urlIndexList.isEmpty()) {
+            return new ArrayList<>(urlIndexList);
+        }
+        urlIndexList = StoreConfigHelper.parseLines(Hawk.get(HawkConfig.API_LINE_LIST, ""));
+        return new ArrayList<>(urlIndexList);
+    }
+
+    public boolean hasLineSwitch() {
+        return getUrlIndexList().size() > 1;
+    }
+
+    public String getCurrentLineName() {
+        String name = Hawk.get(HawkConfig.API_LINE_NAME, "");
+        if (!TextUtils.isEmpty(name)) {
+            return name;
+        }
+        List<UrlIndexItem> items = getUrlIndexList();
+        String currentApi = Hawk.get(HawkConfig.API_URL, "");
+        for (UrlIndexItem item : items) {
+            if (currentApi.equals(item.url)) {
+                return item.name;
+            }
+        }
+        return items.isEmpty() ? "" : items.get(0).name;
+    }
+
+    public void switchLine(UrlIndexItem item) {
+        if (item == null) {
+            return;
+        }
+        applyUrlIndexSelection(item);
+    }
+
+    private void showUrlIndexDialog(Activity activity, List<UrlIndexItem> items, boolean useCache, LoadConfigCallback callback) {
+        if (items.isEmpty()) {
+            postCallbackError(callback, "配置线路为空");
+            return;
+        }
+        if (items.size() == 1) {
+            applyUrlIndexSelection(items.get(0));
+            loadConfig(useCache, callback, activity);
+            return;
+        }
+        Activity host = resolveDialogActivity(activity);
+        if (host == null) {
+            postCallbackError(callback, "配置线路为空");
+            return;
+        }
+        host.runOnUiThread(() -> {
+            if (host.isFinishing()) {
+                postCallbackError(callback, "配置线路为空");
+                return;
+            }
+            ArrayList<String> names = new ArrayList<>();
+            for (UrlIndexItem item : items) {
+                names.add(item.name);
+            }
+            ApiHistoryDialog dialog = new ApiHistoryDialog(host);
+            dialog.setTip("请选择配置线路");
+            dialog.setAdapter(new ApiHistoryDialogAdapter.SelectDialogInterface() {
+                @Override
+                public void click(String value) {
+                    int idx = names.indexOf(value);
+                    if (idx >= 0) {
+                        applyUrlIndexSelection(items.get(idx));
+                        dialog.dismiss();
+                        loadConfig(useCache, callback, host);
+                    }
+                }
+
+                @Override
+                public void del(String value, ArrayList<String> data) {
+                }
+            }, names, 0);
+            dialog.show();
+        });
+    }
+
+    private Activity resolveDialogActivity(Activity activity) {
+        if (activity != null && !activity.isFinishing()) {
+            return activity;
+        }
+        Activity home = AppManager.getInstance().getActivity(HomeActivity.class);
+        if (home != null && !home.isFinishing()) {
+            return home;
+        }
+        return AppManager.getInstance().isActivity() ? AppManager.getInstance().currentActivity() : null;
+    }
+
+    private void postCallbackError(LoadConfigCallback callback, String msg) {
+        new Handler(Looper.getMainLooper()).post(() -> callback.error(msg));
+    }
+
+    public static class UrlIndexItem {
+        public String name;
+        public String url;
     }
 
 
@@ -211,36 +453,40 @@ public class ApiConfig {
     }
 
     private void parseJson(String apiUrl, File f) throws Throwable {
-        System.out.println("从本地缓存加载" + f.getAbsolutePath());
-        BufferedReader bReader = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
-        StringBuilder sb = new StringBuilder();
-        String s = "";
-        while ((s = bReader.readLine()) != null) {
-            sb.append(s + "\n");
-        }
-        bReader.close();
-        parseJson(apiUrl, sb.toString());
+        parseJson(apiUrl, readCache(f));
     }
 
     private void parseJson(String apiUrl, String jsonStr) {
-        JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
+        parseJson(apiUrl, new Gson().fromJson(normalizeJson(jsonStr), JsonObject.class));
+    }
+
+    private void parseJson(String apiUrl, JsonObject infoJson) {
+        sourceBeanList.clear();
+        parseBeanList.clear();
+        mDefaultParse = null;
+        vipParseFlags = new ArrayList<>();
         // spider
         spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
         // 远端站点源
         SourceBean firstSite = null;
-        for (JsonElement opt : infoJson.get("sites").getAsJsonArray()) {
+        JsonArray sitesArray = safeJsonArray(infoJson, "sites");
+        if (sitesArray.size() == 0) {
+            throw new IllegalStateException("配置中无可用站点");
+        }
+        for (JsonElement opt : sitesArray) {
             JsonObject obj = (JsonObject) opt;
             SourceBean sb = new SourceBean();
             String siteKey = obj.get("key").getAsString().trim();
             sb.setKey(siteKey);
             sb.setName(obj.get("name").getAsString().trim());
-            sb.setType(obj.get("type").getAsInt());
-            sb.setApi(obj.get("api").getAsString().trim());
+            String api = DefaultConfig.normalizeCmsApi(obj.get("api").getAsString().trim());
+            sb.setType(DefaultConfig.resolveSourceType(obj.get("type").getAsInt(), api));
+            sb.setApi(api);
             sb.setSearchable(DefaultConfig.safeJsonInt(obj, "searchable", 1));
             sb.setQuickSearch(DefaultConfig.safeJsonInt(obj, "quickSearch", 1));
             sb.setFilterable(DefaultConfig.safeJsonInt(obj, "filterable", 1));
             sb.setPlayerUrl(DefaultConfig.safeJsonString(obj, "playUrl", ""));
-            sb.setExt(DefaultConfig.safeJsonString(obj, "ext", ""));
+            sb.setExt(DefaultConfig.safeJsonExt(obj, "ext", ""));
             sb.setCategories(DefaultConfig.safeJsonStringList(obj, "categories"));
             if (firstSite == null)
                 firstSite = sb;
@@ -249,22 +495,35 @@ public class ApiConfig {
         if (sourceBeanList != null && sourceBeanList.size() > 0) {
             String home = Hawk.get(HawkConfig.HOME_API, "");
             SourceBean sh = getSource(home);
-            if (sh == null)
-                setSourceBean(firstSite);
-            else
+            if (sh == null) {
+                SourceBean defaultHome = firstSite;
+                if (defaultHome != null && defaultHome.getType() == 3) {
+                    for (SourceBean sb : sourceBeanList.values()) {
+                        if (sb.getType() == 1 || sb.getType() == 0) {
+                            defaultHome = sb;
+                            break;
+                        }
+                    }
+                }
+                setSourceBean(defaultHome);
+            } else {
                 setSourceBean(sh);
+            }
         }
         // 需要使用vip解析的flag
         vipParseFlags = DefaultConfig.safeJsonStringList(infoJson, "flags");
         // 解析地址
-        for (JsonElement opt : infoJson.get("parses").getAsJsonArray()) {
+        for (JsonElement opt : safeJsonArray(infoJson, "parses")) {
             JsonObject obj = (JsonObject) opt;
             ParseBean pb = new ParseBean();
             pb.setName(obj.get("name").getAsString().trim());
             pb.setUrl(obj.get("url").getAsString().trim());
-            String ext = obj.has("ext") ? obj.get("ext").getAsJsonObject().toString() : "";
-            pb.setExt(ext);
+            pb.setExt(DefaultConfig.safeJsonExt(obj, "ext", ""));
             pb.setType(DefaultConfig.safeJsonInt(obj, "type", 0));
+            if (pb.getType() == 0 && !TextUtils.isEmpty(pb.getUrl())
+                    && (pb.getUrl().contains("url=") || pb.getUrl().endsWith("="))) {
+                pb.setType(1);
+            }
             parseBeanList.add(pb);
         }
         // 获取默认解析
@@ -275,47 +534,87 @@ public class ApiConfig {
                     if (pb.getName().equals(defaultParse))
                         setDefaultParse(pb);
                 }
-            if (mDefaultParse == null)
-                setDefaultParse(parseBeanList.get(0));
-        }
-        // 直播源
-        liveChannelGroupList.clear();           //修复从后台切换重复加载频道列表
-        try {
-            String lives = infoJson.get("lives").getAsJsonArray().toString();
-            int index = lives.indexOf("proxy://");
-            if (index != -1) {
-                int endIndex = lives.lastIndexOf("\"");
-                String url = lives.substring(index, endIndex);
-                url = DefaultConfig.checkReplaceProxy(url);
-
-                //clan
-                String extUrl = Uri.parse(url).getQueryParameter("ext");
-                if (extUrl != null && !extUrl.isEmpty()) {
-                    String extUrlFix = new String(Base64.decode(extUrl, Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
-                    if (extUrlFix.startsWith("clan://")) {
-                        extUrlFix = clanContentFix(clanToAddress(apiUrl), extUrlFix);
-                        extUrlFix = Base64.encodeToString(extUrlFix.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
-                        url = url.replace(extUrl, extUrlFix);
+            if (mDefaultParse != null && mDefaultParse.getType() == 3 && TextUtils.isEmpty(spider)) {
+                mDefaultParse = null;
+            }
+            if (mDefaultParse == null) {
+                ParseBean selected = null;
+                for (ParseBean pb : parseBeanList) {
+                    if (pb.getType() == 1) {
+                        selected = pb;
+                        break;
                     }
                 }
-                LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
-                liveChannelGroup.setGroupName(url);
-                liveChannelGroupList.add(liveChannelGroup);
-            } else {
-                loadLives(infoJson.get("lives").getAsJsonArray());
+                if (selected == null) {
+                    for (ParseBean pb : parseBeanList) {
+                        if (pb.getType() == 0 && !TextUtils.isEmpty(pb.getUrl())
+                                && !"Web".equalsIgnoreCase(pb.getUrl())
+                                && !"Demo".equalsIgnoreCase(pb.getUrl())) {
+                            selected = pb;
+                            break;
+                        }
+                    }
+                }
+                setDefaultParse(selected != null ? selected : parseBeanList.get(0));
+            }
+        }
+        // 直播源
+        liveChannelGroupList.clear();
+        liveSourceList.clear();
+        inlineLiveCache.clear();
+        try {
+            JsonArray livesArray = safeJsonArray(infoJson, "lives");
+            if (livesArray.size() > 0) {
+                String lives = livesArray.toString();
+                int index = lives.indexOf("proxy://");
+                if (index != -1) {
+                    int endIndex = lives.lastIndexOf("\"");
+                    String url = lives.substring(index, endIndex);
+                    url = DefaultConfig.checkReplaceProxy(url);
+
+                    //clan
+                    String extUrl = Uri.parse(url).getQueryParameter("ext");
+                    if (extUrl != null && !extUrl.isEmpty()) {
+                        String extUrlFix = new String(Base64.decode(extUrl, Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
+                        if (extUrlFix.startsWith("clan://")) {
+                            extUrlFix = clanContentFix(clanToAddress(apiUrl), extUrlFix);
+                            extUrlFix = Base64.encodeToString(extUrlFix.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
+                            url = url.replace(extUrl, extUrlFix);
+                        }
+                    }
+                    LiveSourceBean liveSource = new LiveSourceBean();
+                    liveSource.setName("代理直播");
+                    liveSource.setUrl(url);
+                    liveSourceList.add(liveSource);
+                    applySelectedLiveSource();
+                } else {
+                    JsonObject firstLive = livesArray.get(0).getAsJsonObject();
+                    if (firstLive.has("group") && firstLive.has("channels")) {
+                        loadLives(livesArray);
+                        LiveSourceBean liveSource = new LiveSourceBean();
+                        liveSource.setName("配置内置");
+                        liveSource.setUrl(LiveSourceBean.INLINE);
+                        liveSourceList.add(liveSource);
+                        inlineLiveCache = new ArrayList<>(liveChannelGroupList);
+                        Hawk.put(HawkConfig.LIVE_URL, LiveSourceBean.INLINE);
+                    } else {
+                        parseFongMiLiveSources(livesArray);
+                        applySelectedLiveSource();
+                    }
+                }
             }
         } catch (Throwable th) {
             th.printStackTrace();
         }
         // 广告地址
-        for (JsonElement host : infoJson.getAsJsonArray("ads")) {
+        for (JsonElement host : safeJsonArray(infoJson, "ads")) {
             AdBlocker.addAdHost(host.getAsString());
         }
         // IJK解码配置
         boolean foundOldSelect = false;
         String ijkCodec = Hawk.get(HawkConfig.IJK_CODEC, "");
         ijkCodes = new ArrayList<>();
-        for (JsonElement opt : infoJson.get("ijk").getAsJsonArray()) {
+        for (JsonElement opt : safeJsonArray(infoJson, "ijk")) {
             JsonObject obj = (JsonObject) opt;
             String name = obj.get("group").getAsString();
             LinkedHashMap<String, String> baseOpt = new LinkedHashMap<>();
@@ -348,10 +647,17 @@ public class ApiConfig {
         int channelIndex = 0;
         int channelNum = 0;
         for (JsonElement groupElement : livesArray) {
+            if (!groupElement.isJsonObject()) {
+                continue;
+            }
+            JsonObject groupObj = groupElement.getAsJsonObject();
+            if (!groupObj.has("channels")) {
+                continue;
+            }
             LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
             liveChannelGroup.setLiveChannels(new ArrayList<LiveChannelItem>());
             liveChannelGroup.setGroupIndex(groupIndex++);
-            String groupName = ((JsonObject) groupElement).get("group").getAsString().trim();
+            String groupName = DefaultConfig.safeJsonString(groupObj, "group", "默认");
             String[] splitGroupName = groupName.split("_", 2);
             liveChannelGroup.setGroupName(splitGroupName[0]);
             if (splitGroupName.length > 1)
@@ -359,10 +665,18 @@ public class ApiConfig {
             else
                 liveChannelGroup.setGroupPassword("");
             channelIndex = 0;
-            for (JsonElement channelElement : ((JsonObject) groupElement).get("channels").getAsJsonArray()) {
-                JsonObject obj = (JsonObject) channelElement;
+            JsonArray channels = groupObj.getAsJsonArray("channels");
+            for (JsonElement channelElement : channels) {
+                if (!channelElement.isJsonObject()) {
+                    continue;
+                }
+                JsonObject obj = channelElement.getAsJsonObject();
+                String channelName = DefaultConfig.safeJsonString(obj, "name", "");
+                if (TextUtils.isEmpty(channelName)) {
+                    continue;
+                }
                 LiveChannelItem liveChannelItem = new LiveChannelItem();
-                liveChannelItem.setChannelName(obj.get("name").getAsString().trim());
+                liveChannelItem.setChannelName(channelName);
                 liveChannelItem.setChannelIndex(channelIndex++);
                 liveChannelItem.setChannelNum(++channelNum);
                 ArrayList<String> urls = DefaultConfig.safeJsonStringList(obj, "urls");
@@ -382,8 +696,257 @@ public class ApiConfig {
                 liveChannelItem.setChannelUrls(sourceUrls);
                 liveChannelGroup.getLiveChannels().add(liveChannelItem);
             }
-            liveChannelGroupList.add(liveChannelGroup);
+            if (!liveChannelGroup.getLiveChannels().isEmpty()) {
+                liveChannelGroupList.add(liveChannelGroup);
+            }
         }
+    }
+
+    private void parseFongMiLiveSources(JsonArray livesArray) {
+        for (JsonElement element : livesArray) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
+            JsonObject obj = element.getAsJsonObject();
+            int type = DefaultConfig.safeJsonInt(obj, "type", -1);
+            if (type != 0) {
+                continue;
+            }
+            String url = DefaultConfig.safeJsonString(obj, "url", "");
+            if (TextUtils.isEmpty(url) || !(url.startsWith("http://") || url.startsWith("https://"))) {
+                continue;
+            }
+            String name = DefaultConfig.safeJsonString(obj, "name", "");
+            if (TextUtils.isEmpty(name)) {
+                name = url;
+            }
+            LiveSourceBean liveSource = new LiveSourceBean();
+            liveSource.setName(name);
+            liveSource.setUrl(url);
+            liveSourceList.add(liveSource);
+        }
+    }
+
+    private void applySelectedLiveSource() {
+        if (liveSourceList.isEmpty()) {
+            return;
+        }
+        String selectedUrl = Hawk.get(HawkConfig.LIVE_URL, "");
+        LiveSourceBean selected = null;
+        if (!TextUtils.isEmpty(selectedUrl)) {
+            for (LiveSourceBean source : liveSourceList) {
+                if (selectedUrl.equals(source.getUrl())) {
+                    selected = source;
+                    break;
+                }
+            }
+        }
+        if (selected == null) {
+            selected = liveSourceList.get(0);
+            Hawk.put(HawkConfig.LIVE_URL, selected.getUrl());
+        }
+        liveChannelGroupList.clear();
+        if (selected.isInline()) {
+            liveChannelGroupList.addAll(inlineLiveCache);
+            return;
+        }
+        LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
+        liveChannelGroup.setGroupName(selected.getUrl());
+        liveChannelGroupList.add(liveChannelGroup);
+    }
+
+    public List<LiveSourceBean> getLiveSourceList() {
+        return new ArrayList<>(liveSourceList);
+    }
+
+    public LiveSourceBean getCurrentLiveSource() {
+        String selectedUrl = Hawk.get(HawkConfig.LIVE_URL, "");
+        if (!TextUtils.isEmpty(selectedUrl)) {
+            for (LiveSourceBean source : liveSourceList) {
+                if (selectedUrl.equals(source.getUrl())) {
+                    return source;
+                }
+            }
+        }
+        return liveSourceList.isEmpty() ? null : liveSourceList.get(0);
+    }
+
+    public String getCurrentLiveSourceName() {
+        LiveSourceBean source = getCurrentLiveSource();
+        return source != null ? source.getName() : "未设置";
+    }
+
+    public void setLiveSource(LiveSourceBean source) {
+        if (source == null) {
+            return;
+        }
+        Hawk.put(HawkConfig.LIVE_URL, source.getUrl());
+        Hawk.put(HawkConfig.LIVE_CHANNEL, "");
+        applySelectedLiveSource();
+    }
+
+    public void loadLiveContent(String content) {
+        liveChannelGroupList.clear();
+        if (TextUtils.isEmpty(content)) {
+            return;
+        }
+        String trimmed = content.trim();
+        if (trimmed.startsWith("[")) {
+            try {
+                loadLives(new Gson().fromJson(trimmed, JsonArray.class));
+            } catch (Throwable ignored) {
+            }
+            return;
+        }
+        if (trimmed.startsWith("#EXTM3U")) {
+            parseLiveM3u(trimmed);
+        } else {
+            parseLiveTxt(trimmed);
+        }
+    }
+
+    private void parseLiveTxt(String content) {
+        LiveChannelGroup currentGroup = null;
+        int groupIndex = 0;
+        int channelIndex = 0;
+        int channelNum = 0;
+        int[] counters = new int[2];
+        String[] lines = content.split("\\r?\\n");
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+            if (line.contains(",#genre#")) {
+                String groupName = line.substring(0, line.indexOf(",#genre#")).trim();
+                currentGroup = new LiveChannelGroup();
+                currentGroup.setLiveChannels(new ArrayList<LiveChannelItem>());
+                currentGroup.setGroupIndex(groupIndex++);
+                currentGroup.setGroupName(groupName);
+                currentGroup.setGroupPassword("");
+                liveChannelGroupList.add(currentGroup);
+                channelIndex = 0;
+                counters[0] = 0;
+                continue;
+            }
+            int comma = line.indexOf(',');
+            if (comma <= 0 || comma >= line.length() - 1) {
+                continue;
+            }
+            if (currentGroup == null) {
+                currentGroup = new LiveChannelGroup();
+                currentGroup.setLiveChannels(new ArrayList<LiveChannelItem>());
+                currentGroup.setGroupIndex(groupIndex++);
+                currentGroup.setGroupName("默认");
+                currentGroup.setGroupPassword("");
+                liveChannelGroupList.add(currentGroup);
+                counters[0] = 0;
+            }
+            String channelName = line.substring(0, comma).trim();
+            String urlPart = line.substring(comma + 1).trim();
+            if (!urlPart.startsWith("http://") && !urlPart.startsWith("https://")) {
+                continue;
+            }
+            counters[0] = channelIndex;
+            addLiveChannel(currentGroup, channelName, urlPart, counters);
+            channelIndex = counters[0];
+            channelNum = counters[1];
+        }
+    }
+
+    private void parseLiveM3u(String content) {
+        LiveChannelGroup currentGroup = null;
+        int groupIndex = 0;
+        int channelIndex = 0;
+        int channelNum = 0;
+        int[] counters = new int[2];
+        String pendingName = null;
+        String pendingGroup = "默认";
+        String[] lines = content.split("\\r?\\n");
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            if (line.startsWith("#EXTINF")) {
+                pendingGroup = "默认";
+                int groupTitleIndex = line.indexOf("group-title=\"");
+                if (groupTitleIndex >= 0) {
+                    int end = line.indexOf('"', groupTitleIndex + 13);
+                    if (end > groupTitleIndex) {
+                        pendingGroup = line.substring(groupTitleIndex + 13, end).trim();
+                    }
+                }
+                int nameIndex = line.lastIndexOf(',');
+                pendingName = nameIndex >= 0 && nameIndex < line.length() - 1
+                        ? line.substring(nameIndex + 1).trim() : "";
+            } else if (!line.startsWith("#") && pendingName != null) {
+                if (currentGroup == null || !pendingGroup.equals(currentGroup.getGroupName())) {
+                    currentGroup = findLiveGroup(pendingGroup);
+                    if (currentGroup == null) {
+                        currentGroup = new LiveChannelGroup();
+                        currentGroup.setLiveChannels(new ArrayList<LiveChannelItem>());
+                        currentGroup.setGroupIndex(groupIndex++);
+                        currentGroup.setGroupName(pendingGroup);
+                        currentGroup.setGroupPassword("");
+                        liveChannelGroupList.add(currentGroup);
+                        counters[0] = 0;
+                    }
+                    channelIndex = counters[0];
+                }
+                counters[0] = channelIndex;
+                addLiveChannel(currentGroup, pendingName, line, counters);
+                channelIndex = counters[0];
+                channelNum = counters[1];
+                pendingName = null;
+            }
+        }
+    }
+
+    private LiveChannelGroup findLiveGroup(String groupName) {
+        for (LiveChannelGroup group : liveChannelGroupList) {
+            if (groupName.equals(group.getGroupName())) {
+                return group;
+            }
+        }
+        return null;
+    }
+
+    private void addLiveChannel(LiveChannelGroup group, String channelName, String urlPart, int[] counters) {
+        ArrayList<LiveChannelItem> channels = group.getLiveChannels();
+        LiveChannelItem existing = null;
+        for (LiveChannelItem item : channels) {
+            if (channelName.equals(item.getChannelName())) {
+                existing = item;
+                break;
+            }
+        }
+        String[] splitText = urlPart.split("\\$", 2);
+        String sourceUrl = splitText[0].trim();
+        String sourceName = splitText.length > 1 ? splitText[1].trim() : null;
+        if (existing != null) {
+            int sourceIndex = existing.getChannelUrls().size() + 1;
+            if (TextUtils.isEmpty(sourceName)) {
+                sourceName = "源" + sourceIndex;
+            }
+            existing.getChannelUrls().add(sourceUrl);
+            existing.getChannelSourceNames().add(sourceName);
+            return;
+        }
+        if (TextUtils.isEmpty(sourceName)) {
+            sourceName = "源1";
+        }
+        LiveChannelItem liveChannelItem = new LiveChannelItem();
+        liveChannelItem.setChannelName(channelName);
+        liveChannelItem.setChannelIndex(counters[0]++);
+        liveChannelItem.setChannelNum(++counters[1]);
+        ArrayList<String> sourceUrls = new ArrayList<>();
+        sourceUrls.add(sourceUrl);
+        ArrayList<String> sourceNames = new ArrayList<>();
+        sourceNames.add(sourceName);
+        liveChannelItem.setChannelUrls(sourceUrls);
+        liveChannelItem.setChannelSourceNames(sourceNames);
+        channels.add(liveChannelItem);
     }
 
     public String getSpider() {

@@ -29,6 +29,8 @@ import com.github.tvbox.osc.ui.tv.QRCodeGen;
 import com.github.tvbox.osc.ui.tv.widget.SearchKeyboard;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.PinyinSearchHelper;
+import com.github.tvbox.osc.util.SearchSuggestHelper;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -47,7 +49,10 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -71,6 +76,8 @@ public class SearchActivity extends BaseActivity {
     private SearchAdapter searchAdapter;
     private PinyinAdapter wordAdapter;
     private String searchTitle = "";
+    private final ArrayList<String> searchCorpus = new ArrayList<>();
+    private List<String> searchKeywords = new ArrayList<>();
 
     @Override
     protected int getLayoutResID() {
@@ -90,7 +97,7 @@ public class SearchActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         if (pauseRunnable != null && pauseRunnable.size() > 0) {
-            searchExecutorService = Executors.newFixedThreadPool(5);
+            searchExecutorService = Executors.newFixedThreadPool(getSearchThreadCount());
             allRunCount.set(pauseRunnable.size());
             for (Runnable runnable : pauseRunnable) {
                 searchExecutorService.execute(runnable);
@@ -122,12 +129,7 @@ public class SearchActivity extends BaseActivity {
             }
         });
         mGridView.setHasFixedSize(true);
-        // lite
-        if (Hawk.get(HawkConfig.SEARCH_VIEW, 0) == 0)
-            mGridView.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
-            // with preview
-        else
-            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 3));
+        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 3));
         searchAdapter = new SearchAdapter();
         mGridView.setAdapter(searchAdapter);
         searchAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
@@ -203,38 +205,58 @@ public class SearchActivity extends BaseActivity {
     }
 
     /**
-     * 拼音联想
+     * 拼音联想：本地简拼匹配 + 腾讯接口补充
      */
     private void loadRec(String key) {
-        OkGo.<String>get("https://s.video.qq.com/smartbox")
-                .params("plat", 2)
-                .params("ver", 0)
-                .params("num", 10)
-                .params("otype", "json")
-                .params("query", key)
-                .execute(new AbsCallback<String>() {
-                    @Override
-                    public void onSuccess(Response<String> response) {
-                        try {
-                            ArrayList<String> hots = new ArrayList<>();
-                            String result = response.body();
-                            JsonObject json = JsonParser.parseString(result.substring(result.indexOf("{"), result.lastIndexOf("}") + 1)).getAsJsonObject();
-                            JsonArray itemList = json.get("item").getAsJsonArray();
-                            for (JsonElement ele : itemList) {
-                                JsonObject obj = (JsonObject) ele;
-                                hots.add(obj.get("word").getAsString().trim());
-                            }
-                            wordAdapter.setNewData(hots);
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                    }
+        if (TextUtils.isEmpty(key)) {
+            return;
+        }
+        if (PinyinSearchHelper.isLatinInput(key)) {
+            List<String> local = PinyinSearchHelper.matchLatin(key, searchCorpus);
+            if (!local.isEmpty()) {
+                wordAdapter.setNewData(local);
+            }
+        }
+        SearchSuggestHelper.fetch(key, new SearchSuggestHelper.Callback() {
+            @Override
+            public void onResult(List<String> titles) {
+                LinkedHashSet<String> merged = new LinkedHashSet<>();
+                if (PinyinSearchHelper.isLatinInput(key)) {
+                    merged.addAll(PinyinSearchHelper.matchLatin(key, searchCorpus));
+                }
+                merged.addAll(titles);
+                ArrayList<String> list = new ArrayList<>(merged);
+                addToCorpus(list);
+                if (!list.isEmpty()) {
+                    wordAdapter.setNewData(list);
+                }
+            }
 
-                    @Override
-                    public String convertResponse(okhttp3.Response response) throws Throwable {
-                        return response.body().string();
-                    }
-                });
+            @Override
+            public void onError() {
+                fallbackLocalRec(key);
+            }
+        });
+    }
+
+    private void fallbackLocalRec(String key) {
+        if (PinyinSearchHelper.isLatinInput(key)) {
+            List<String> local = PinyinSearchHelper.matchLatin(key, searchCorpus);
+            if (!local.isEmpty()) {
+                wordAdapter.setNewData(local);
+            }
+        }
+    }
+
+    private void addToCorpus(List<String> words) {
+        if (words == null) {
+            return;
+        }
+        for (String word : words) {
+            if (!TextUtils.isEmpty(word) && !searchCorpus.contains(word)) {
+                searchCorpus.add(word);
+            }
+        }
     }
 
     private void initData() {
@@ -246,6 +268,14 @@ public class SearchActivity extends BaseActivity {
             search(title);
         }
         // 加载热词
+        ArrayList<String> fallbackHots = new ArrayList<>();
+        fallbackHots.add("完美世界");
+        fallbackHots.add("镖人");
+        fallbackHots.add("爱情有烟火");
+        fallbackHots.add("庆余年");
+        fallbackHots.add("斗罗大陆");
+        addToCorpus(fallbackHots);
+        wordAdapter.setNewData(fallbackHots);
         OkGo.<String>get("https://node.video.qq.com/x/api/hot_mobilesearch")
                 .params("channdlId", "0")
                 .params("_", System.currentTimeMillis())
@@ -259,6 +289,7 @@ public class SearchActivity extends BaseActivity {
                                 JsonObject obj = (JsonObject) ele;
                                 hots.add(obj.get("title").getAsString().trim().replaceAll("<|>|《|》|-", "").split(" ")[0]);
                             }
+                            addToCorpus(hots);
                             wordAdapter.setNewData(hots);
                         } catch (Throwable th) {
                             th.printStackTrace();
@@ -304,7 +335,48 @@ public class SearchActivity extends BaseActivity {
         this.searchTitle = title;
         mGridView.setVisibility(View.INVISIBLE);
         searchAdapter.setNewData(new ArrayList<>());
+
+        if (PinyinSearchHelper.isLatinInput(title)) {
+            List<String> keywords = PinyinSearchHelper.resolveSearchKeywords(title, searchCorpus);
+            if (keywords.isEmpty()) {
+                resolveLatinFromRemote(title);
+                return;
+            }
+            this.searchKeywords = keywords;
+            searchResult();
+            return;
+        }
+        this.searchKeywords = new ArrayList<>();
+        this.searchKeywords.add(title);
         searchResult();
+    }
+
+    private void resolveLatinFromRemote(final String latin) {
+        SearchSuggestHelper.fetch(latin, new SearchSuggestHelper.Callback() {
+            @Override
+            public void onResult(List<String> titles) {
+                addToCorpus(titles);
+                wordAdapter.setNewData(titles);
+                searchKeywords = titles;
+                searchResult();
+            }
+
+            @Override
+            public void onError() {
+                onLatinResolveFailed(latin);
+            }
+        });
+    }
+
+    private void onLatinResolveFailed(String latin) {
+        List<String> local = PinyinSearchHelper.matchLatin(latin, searchCorpus);
+        if (!local.isEmpty()) {
+            searchKeywords = local;
+            searchResult();
+            return;
+        }
+        showEmpty();
+        Toast.makeText(mContext, "未识别简拼「" + latin + "」，请从左侧选择片名", Toast.LENGTH_LONG).show();
     }
 
     private ExecutorService searchExecutorService = null;
@@ -322,7 +394,7 @@ public class SearchActivity extends BaseActivity {
             searchAdapter.setNewData(new ArrayList<>());
             allRunCount.set(0);
         }
-        searchExecutorService = Executors.newFixedThreadPool(5);
+        searchExecutorService = Executors.newFixedThreadPool(getSearchThreadCount());
         List<SourceBean> searchRequestList = new ArrayList<>();
         searchRequestList.addAll(ApiConfig.get().getSourceBeanList());
         SourceBean home = ApiConfig.get().getHomeSourceBean();
@@ -335,24 +407,45 @@ public class SearchActivity extends BaseActivity {
                 continue;
             }
             siteKey.add(bean.getKey());
-            allRunCount.incrementAndGet();
         }
-        for (String key : siteKey) {
-            searchExecutorService.execute(new Runnable() {
-                @Override
-                public void run() {
-                    sourceViewModel.getSearch(key, searchTitle);
-                }
-            });
+        if (searchKeywords == null || searchKeywords.isEmpty()) {
+            searchKeywords = new ArrayList<>();
+            searchKeywords.add(searchTitle);
+        }
+        allRunCount.set(siteKey.size() * searchKeywords.size());
+        if (allRunCount.get() <= 0) {
+            showEmpty();
+            Toast.makeText(mContext, "没有可搜索的源", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        for (String keyword : searchKeywords) {
+            for (String key : siteKey) {
+                searchExecutorService.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        sourceViewModel.getSearch(key, keyword);
+                    }
+                });
+            }
         }
     }
 
     private void searchData(AbsXml absXml) {
         if (absXml != null && absXml.movie != null && absXml.movie.videoList != null && absXml.movie.videoList.size() > 0) {
             List<Movie.Video> data = new ArrayList<>();
+            Set<String> exists = new HashSet<>();
+            for (Movie.Video old : searchAdapter.getData()) {
+                exists.add(old.sourceKey + "|" + old.id + "|" + old.name);
+            }
             for (Movie.Video video : absXml.movie.videoList) {
-                if (video.name.contains(searchTitle))
-                    data.add(video);
+                if (video != null && video.name != null && !video.name.isEmpty()
+                        && video.id != null && !video.id.isEmpty()) {
+                    String dedupeKey = video.sourceKey + "|" + video.id + "|" + video.name;
+                    if (!exists.contains(dedupeKey)) {
+                        exists.add(dedupeKey);
+                        data.add(video);
+                    }
+                }
             }
             if (searchAdapter.getData().size() > 0) {
                 searchAdapter.addData(data);
@@ -367,6 +460,9 @@ public class SearchActivity extends BaseActivity {
         if (count <= 0) {
             if (searchAdapter.getData().size() <= 0) {
                 showEmpty();
+                if (searchTitle != null && PinyinSearchHelper.isLatinInput(searchTitle)) {
+                    Toast.makeText(mContext, "简拼「" + searchTitle + "」未搜到结果，可尝试左侧推荐片名", Toast.LENGTH_LONG).show();
+                }
             }
             cancel();
         }
@@ -374,6 +470,12 @@ public class SearchActivity extends BaseActivity {
 
     private void cancel() {
         OkGo.getInstance().cancelTag("search");
+        OkGo.getInstance().cancelTag("search_suggest");
+    }
+
+    private int getSearchThreadCount() {
+        int count = Hawk.get(HawkConfig.SEARCH_THREAD, 16);
+        return count < 1 ? 1 : count;
     }
 
     @Override

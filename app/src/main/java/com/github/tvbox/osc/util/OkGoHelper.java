@@ -22,6 +22,7 @@ import javax.net.ssl.X509TrustManager;
 import okhttp3.Cache;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.dnsoverhttps.DnsOverHttps;
 import okhttp3.internal.Version;
 import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
@@ -120,6 +121,21 @@ public class OkGoHelper {
         //builder.retryOnConnectionFailure(false);
 
         builder.addInterceptor(loggingInterceptor);
+        builder.addInterceptor(chain -> {
+            Request request = chain.request();
+            Request.Builder reqBuilder = request.newBuilder();
+            reqBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            String url = request.url().toString();
+            String host = request.url().host();
+            if (url.contains("api.php") || url.contains("/provide/vod")) {
+                if (host.contains("dytt")) {
+                    reqBuilder.header("Referer", "https://www.dyttzy.tv/");
+                } else {
+                    reqBuilder.header("Referer", request.url().scheme() + "://" + host + "/");
+                }
+            }
+            return chain.proceed(reqBuilder.build());
+        });
 
         builder.readTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS);
         builder.writeTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS);
@@ -142,7 +158,19 @@ public class OkGoHelper {
     }
 
     static void initPicasso(OkHttpClient client) {
-        OkHttp3Downloader downloader = new OkHttp3Downloader(client);
+        OkHttpClient picClient = client.newBuilder()
+                .addInterceptor(chain -> {
+                    Request request = chain.request();
+                    String host = request.url().host();
+                    Request.Builder builder = request.newBuilder();
+                    if (host.contains("doubanio.com") || host.contains("douban.com")) {
+                        builder.header("Referer", "https://movie.douban.com/");
+                    }
+                    builder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                    return chain.proceed(builder.build());
+                })
+                .build();
+        OkHttp3Downloader downloader = new OkHttp3Downloader(picClient);
         Picasso picasso = new Picasso.Builder(App.getInstance()).downloader(downloader).build();
         Picasso.setSingletonInstance(picasso);
     }

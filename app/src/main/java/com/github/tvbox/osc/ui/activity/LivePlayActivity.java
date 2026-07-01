@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.IntEvaluator;
 import android.animation.ObjectAnimator;
 import android.os.Handler;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -37,8 +38,6 @@ import com.github.tvbox.osc.ui.dialog.LivePasswordDialog;
 import com.github.tvbox.osc.ui.tv.widget.ViewObj;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 import com.lzy.okgo.model.Response;
@@ -774,7 +773,7 @@ public class LivePlayActivity extends BaseActivity {
             return;
         }
 
-        if (list.size() == 1 && list.get(0).getGroupName().startsWith("http://127.0.0.1")) {
+        if (list.size() == 1 && isRemoteLiveUrl(list.get(0).getGroupName())) {
             showLoading();
             loadProxyLives(list.get(0).getGroupName());
         }
@@ -784,6 +783,11 @@ public class LivePlayActivity extends BaseActivity {
             showSuccess();
             initLiveState();
         }
+    }
+
+    private boolean isRemoteLiveUrl(String url) {
+        return !TextUtils.isEmpty(url)
+                && (url.startsWith("http://") || url.startsWith("https://"));
     }
 
     public void loadProxyLives(String url) {
@@ -796,8 +800,7 @@ public class LivePlayActivity extends BaseActivity {
 
             @Override
             public void onSuccess(Response<String> response) {
-                JsonArray livesArray = new Gson().fromJson(response.body(), JsonArray.class);
-                ApiConfig.get().loadLives(livesArray);
+                ApiConfig.get().loadLiveContent(response.body());
                 List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
                 if (list.isEmpty()) {
                     Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
@@ -812,6 +815,18 @@ public class LivePlayActivity extends BaseActivity {
                     public void run() {
                         LivePlayActivity.this.showSuccess();
                         initLiveState();
+                    }
+                });
+            }
+
+            @Override
+            public void onError(Response<String> response) {
+                super.onError(response);
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(App.getInstance(), "直播源加载失败", Toast.LENGTH_SHORT).show();
+                        finish();
                     }
                 });
             }

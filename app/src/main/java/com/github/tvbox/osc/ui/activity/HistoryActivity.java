@@ -14,6 +14,8 @@ import com.github.tvbox.osc.cache.RoomDataManger;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.ui.adapter.HistoryAdapter;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
+import com.github.tvbox.osc.util.HawkConfig;
+import com.orhanobut.hawk.Hawk;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
 import com.owen.tvrecyclerview.widget.V7GridLayoutManager;
 
@@ -142,7 +144,7 @@ public class HistoryActivity extends BaseActivity {
     }
 
     private void initData() {
-        List<VodInfo> allVodRecord = RoomDataManger.getAllVodRecord(100);
+        List<VodInfo> allVodRecord = RoomDataManger.getAllVodRecord(Hawk.get(HawkConfig.HISTORY_COUNT, 30));
         List<VodInfo> vodInfoList = new ArrayList<>();
         for (VodInfo vodInfo : allVodRecord) {
             vodInfoList.add(vodInfo);

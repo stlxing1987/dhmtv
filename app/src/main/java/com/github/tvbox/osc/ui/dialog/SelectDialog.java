@@ -2,6 +2,7 @@ package com.github.tvbox.osc.ui.dialog;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -17,13 +18,21 @@ import java.util.List;
 
 public class SelectDialog<T> extends BaseDialog {
     public SelectDialog(@NonNull @NotNull Context context) {
-        super(context);
+        super(context, R.style.CustomDialogStyleDim);
         setContentView(R.layout.dialog_select);
+        setupOutsideDismiss(findViewById(R.id.dialogRoot), findViewById(R.id.dialogContent));
     }
 
     public SelectDialog(@NonNull @NotNull Context context, int resId) {
-        super(context);
+        super(context, R.style.CustomDialogStyleDim);
         setContentView(resId);
+        View root = findViewById(R.id.dialogRoot);
+        View content = findViewById(R.id.dialogContent);
+        if (root != null && content != null) {
+            setupOutsideDismiss(root, content);
+        } else {
+            enableDismissOnTouchOutside();
+        }
     }
 
     @Override

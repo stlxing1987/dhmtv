@@ -18,6 +18,7 @@ public class ApiHistoryDialog extends BaseDialog {
     public ApiHistoryDialog(@NonNull @NotNull Context context) {
         super(context, R.style.CustomDialogStyleDim);
         setContentView(R.layout.dialog_api_history);
+        setupOutsideDismiss(findViewById(R.id.dialogRoot), findViewById(R.id.dialogContent));
     }
 
     @Override

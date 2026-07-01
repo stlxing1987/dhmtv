@@ -1,16 +1,21 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdkVersion 30
+    namespace 'com.github.tvbox.osc'
+    compileSdk 34
 
     defaultConfig {
         applicationId 'com.github.tvbox.osc'
-        minSdkVersion 16
-        targetSdkVersion 26
+        minSdk 21
+        targetSdk 34
         versionCode 1
         versionName '1.0.0'
         multiDexEnabled true
-        //设置room的Schema的位置
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments = ["room.schemaLocation": "$projectDir/schemas".toString()]
@@ -18,25 +23,22 @@ android {
         }
     }
 
-    packagingOptions {
-        exclude 'META-INF/DEPENDENCIES'
+    packaging {
+        resources {
+            exclude 'META-INF/DEPENDENCIES'
+        }
     }
 
     buildTypes {
         debug {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             minifyEnabled false
-
-            ndk {
-                abiFilters 'armeabi-v7a'
-            }
         }
         release {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             minifyEnabled true
-
             ndk {
-                abiFilters 'armeabi-v7a'
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
             }
         }
     }
@@ -46,21 +48,14 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    lintOptions {
+    lint {
         checkReleaseBuilds false
         abortOnError false
-    }
-    dexOptions {
-        javaMaxHeapSize "4g"
-        additionalParameters += '--multi-dex'
-        additionalParameters += '--set-max-idx-number=48000'
-        additionalParameters += '--minimal-main-dex'
     }
 }
 
 dependencies {
     api fileTree(dir: "libs", include: ["*.jar"])
-
 
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
     implementation 'com.google.zxing:core:3.4.1'
@@ -85,14 +80,12 @@ dependencies {
     }
     implementation 'org.greenrobot:eventbus:3.2.0'
     implementation 'com.orhanobut:hawk:2.0.1'
+    implementation 'com.github.promeg:tinypinyin:2.0.3'
 
     implementation project(":player")
 
-    implementation('org.xwalk:xwalk_shared_library:23.53.589.4') {
-        exclude group: 'com.android.support'
-    }
+    implementation files('libs/xwalk_shared_library-23.53.589.4.aar')
     implementation 'com.lzy.net:okgo:3.0.4'
-    // implementation 'com.tencent.bugly:crashreport_upgrade:latest.release'
     implementation 'com.owen:tv-recyclerview:3.0.0'
 
     implementation 'com.github.getActivity:XXPermissions:13.6'

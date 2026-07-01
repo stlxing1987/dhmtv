@@ -28,6 +28,7 @@ import com.github.tvbox.osc.base.BaseActivity;
 import com.github.tvbox.osc.base.BaseLazyFragment;
 import com.github.tvbox.osc.bean.AbsSortXml;
 import com.github.tvbox.osc.bean.MovieSort;
+import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.ui.adapter.HomePageAdapter;
@@ -43,6 +44,7 @@ import com.github.tvbox.osc.util.AppManager;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
+import com.github.tvbox.osc.util.SettingUiHelper;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.orhanobut.hawk.Hawk;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
@@ -98,6 +100,7 @@ public class HomeActivity extends BaseActivity {
 
     @Override
     protected void init() {
+        getWindow().setBackgroundDrawableResource(SettingUiHelper.WALLPAPER_RES[SettingUiHelper.getWallpaperIndex()]);
         EventBus.getDefault().register(this);
         ControlManager.get().startServer();
         initView();
@@ -187,6 +190,9 @@ public class HomeActivity extends BaseActivity {
             @Override
             public void onChanged(AbsSortXml absXml) {
                 showSuccess();
+                if (absXml == null && tryFallbackHomeSource()) {
+                    return;
+                }
                 if (absXml != null && absXml.classes != null && absXml.classes.sortList != null) {
                     sortAdapter.setNewData(DefaultConfig.adjustSort(ApiConfig.get().getHomeSourceBean().getKey(), absXml.classes.sortList, true));
                 } else {
@@ -199,6 +205,27 @@ public class HomeActivity extends BaseActivity {
 
     private boolean dataInitOk = false;
     private boolean jarInitOk = false;
+    private boolean homeSourceFallbackTried = false;
+
+    private boolean tryFallbackHomeSource() {
+        if (homeSourceFallbackTried) {
+            return false;
+        }
+        SourceBean home = ApiConfig.get().getHomeSourceBean();
+        if (home == null || home.getKey() == null || home.getKey().isEmpty() || home.getType() != 3) {
+            return false;
+        }
+        for (SourceBean sb : ApiConfig.get().getSourceBeanList()) {
+            if (sb.getType() == 1 || sb.getType() == 0) {
+                homeSourceFallbackTried = true;
+                ApiConfig.get().setSourceBean(sb);
+                Toast.makeText(this, "已切换首页源: " + sb.getName(), Toast.LENGTH_SHORT).show();
+                sourceViewModel.getSort(sb.getKey());
+                return true;
+            }
+        }
+        return false;
+    }
 
     private void initData() {
         if (dataInitOk && jarInitOk) {

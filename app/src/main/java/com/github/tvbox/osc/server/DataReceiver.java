@@ -13,7 +13,7 @@ public interface DataReceiver {
     void onTextReceived(String text);
 
 
-    void onApiReceived(String url);
+    void onApiReceived(String name, String url);
 
     void onPushReceived(String url);
 }

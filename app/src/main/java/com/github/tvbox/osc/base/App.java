@@ -8,6 +8,7 @@ import com.github.tvbox.osc.data.AppDataManager;
 import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.OkGoHelper;
+import com.github.tvbox.osc.util.PinyinSearchHelper;
 import com.github.tvbox.osc.util.PlayerHelper;
 import com.kingja.loadsir.core.LoadSir;
 import com.orhanobut.hawk.Hawk;
@@ -44,6 +45,7 @@ public class App extends MultiDexApplication {
                 .setSupportSP(false)
                 .setSupportSubunits(Subunits.MM);
         PlayerHelper.init();
+        PinyinSearchHelper.init();
     }
 
     private void initParams() {
@@ -51,7 +53,12 @@ public class App extends MultiDexApplication {
         Hawk.init(this).build();
         Hawk.put(HawkConfig.DEBUG_OPEN, false);
         if (!Hawk.contains(HawkConfig.PLAY_TYPE)) {
-            Hawk.put(HawkConfig.PLAY_TYPE, 1);
+            Hawk.put(HawkConfig.PLAY_TYPE, PlayerHelper.isIjkAvailable() ? 1 : 2);
+        } else if (Hawk.get(HawkConfig.PLAY_TYPE, 0) == 1 && !PlayerHelper.isIjkAvailable()) {
+            Hawk.put(HawkConfig.PLAY_TYPE, 2);
+        }
+        if (!Hawk.contains(HawkConfig.SEARCH_VIEW)) {
+            Hawk.put(HawkConfig.SEARCH_VIEW, 1);
         }
     }
 

@@ -42,7 +42,11 @@ public class InputRequestProcess implements RequestProcess {
                             break;
                         }
                         case "api": {
-                            mDataReceiver.onApiReceived(params.get("url").trim());
+                            String name = params.get("name");
+                            String url = params.get("url");
+                            if (url != null) {
+                                mDataReceiver.onApiReceived(name == null ? "" : name.trim(), url.trim());
+                            }
                             break;
                         }
                         case "push": {

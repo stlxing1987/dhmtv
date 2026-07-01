@@ -19,6 +19,22 @@ public class BaseDialog extends Dialog {
         super(context, customDialogStyle);
     }
 
+    protected void enableDismissOnTouchOutside() {
+        setCanceledOnTouchOutside(true);
+        setCancelable(true);
+    }
+
+    protected void setupOutsideDismiss(View rootView, View contentPanel) {
+        enableDismissOnTouchOutside();
+        if (rootView != null) {
+            rootView.setOnClickListener(v -> dismiss());
+        }
+        if (contentPanel != null) {
+            contentPanel.setOnClickListener(v -> {
+            });
+        }
+    }
+
     @Override
     public void show() {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);

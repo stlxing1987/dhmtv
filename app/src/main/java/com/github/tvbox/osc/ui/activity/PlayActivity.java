@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -254,13 +255,40 @@ public class PlayActivity extends BaseActivity {
                         hideTip();
                         PlayerHelper.updateCfg(mVideoView, mVodPlayerCfg);
                         mVideoView.setProgressKey(progressKey);
-                        if (headers != null) {
-                            mVideoView.setUrl(url, headers);
+                        HashMap<String, String> playHeaders = headers;
+                        if (playHeaders == null) {
+                            playHeaders = new HashMap<>();
+                        } else {
+                            playHeaders = new HashMap<>(playHeaders);
+                        }
+                        DefaultConfig.mergeDyttPlayHeaders(playHeaders, url);
+                        if (playHeaders.isEmpty()) {
+                            playHeaders = null;
+                        }
+                        if (playHeaders != null) {
+                            mVideoView.setUrl(url, playHeaders);
                         } else {
                             mVideoView.setUrl(url);
                         }
-                        mVideoView.start();
-                        mController.resetSpeed();
+                        try {
+                            mVideoView.start();
+                            mController.resetSpeed();
+                        } catch (UnsatisfiedLinkError | Exception e) {
+                            e.printStackTrace();
+                            if (PlayerHelper.fallbackToExo(mVideoView, mVodPlayerCfg)) {
+                                mController.setPlayerConfig(mVodPlayerCfg);
+                                if (playHeaders != null) {
+                                    mVideoView.setUrl(url, playHeaders);
+                                } else {
+                                    mVideoView.setUrl(url);
+                                }
+                                mVideoView.start();
+                                mController.resetSpeed();
+                                Toast.makeText(PlayActivity.this, "IJK不可用，已切换Exo播放器", Toast.LENGTH_SHORT).show();
+                            } else {
+                                errorWithRetry("播放失败", true);
+                            }
+                        }
                     }
                 }
             }
@@ -280,7 +308,11 @@ public class PlayActivity extends BaseActivity {
                         playSubtitle = info.optString("subt", /*"https://dash.akamaized.net/akamai/test/caption_test/ElephantsDream/ElephantsDream_en.vtt"*/"");
                         String playUrl = info.optString("playUrl", "");
                         String flag = info.optString("flag");
-                        String url = info.getString("url");
+                        String url = info.optString("url", "");
+                        if (url.isEmpty()) {
+                            errorWithRetry("播放地址为空", true);
+                            return;
+                        }
                         HashMap<String, String> headers = null;
                         if (info.has("header")) {
                             try {
@@ -298,6 +330,17 @@ public class PlayActivity extends BaseActivity {
                             }
                         }
                         if (parse || jx) {
+                            if (DefaultConfig.isDyttShareUrl(url)) {
+                                doParseDyttShare(url);
+                                return;
+                            }
+                            if (info.optInt("dyttSign", 0) == 1) {
+                                String shareUrl = findDyttShareUrl(mVodInfo.playIndex);
+                                if (shareUrl != null) {
+                                    doParseDyttShare(shareUrl);
+                                    return;
+                                }
+                            }
                             boolean userJxList = (playUrl.isEmpty() && ApiConfig.get().getVipParseFlags().contains(flag)) || jx;
                             initParse(flag, userJxList, playUrl, url);
                         } else {
@@ -334,7 +377,12 @@ public class PlayActivity extends BaseActivity {
         }
         try {
             if (!mVodPlayerCfg.has("pl")) {
-                mVodPlayerCfg.put("pl", Hawk.get(HawkConfig.PLAY_TYPE, 1));
+                mVodPlayerCfg.put("pl", PlayerHelper.resolvePlayType(Hawk.get(HawkConfig.PLAY_TYPE, 1)));
+            } else {
+                try {
+                    mVodPlayerCfg.put("pl", PlayerHelper.resolvePlayType(mVodPlayerCfg.getInt("pl")));
+                } catch (JSONException ignored) {
+                }
             }
             if (!mVodPlayerCfg.has("pr")) {
                 mVodPlayerCfg.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
@@ -461,9 +509,21 @@ public class PlayActivity extends BaseActivity {
         String playTitleInfo = mVodInfo.name + " " + vs.name;
         mController.setTitle(playTitleInfo);
 
+        if (TextUtils.isEmpty(vs.url)) {
+            errorWithRetry("播放地址为空", true);
+            return;
+        }
+
         playUrl(null, null);
         String progressKey = mVodInfo.sourceKey + mVodInfo.id + mVodInfo.playFlag + mVodInfo.playIndex;
-        if (Thunder.play(vs.url, new Thunder.ThunderCallback() {
+        String episodeUrl = vs.url;
+        if (DefaultConfig.needsDyttSign(episodeUrl)) {
+            String shareUrl = findDyttShareUrl(mVodInfo.playIndex);
+            if (shareUrl != null) {
+                episodeUrl = shareUrl;
+            }
+        }
+        if (Thunder.play(episodeUrl, new Thunder.ThunderCallback() {
             @Override
             public void status(int code, String info) {
                 if (code < 0) {
@@ -485,7 +545,61 @@ public class PlayActivity extends BaseActivity {
             mController.showParse(false);
             return;
         }
-        sourceViewModel.getPlay(sourceKey, mVodInfo.playFlag, progressKey, vs.url);
+        sourceViewModel.getPlay(sourceKey, mVodInfo.playFlag, progressKey, episodeUrl);
+    }
+
+    private String findDyttShareUrl(int index) {
+        if (mVodInfo == null || mVodInfo.seriesMap == null) {
+            return null;
+        }
+        for (java.util.Map.Entry<String, java.util.List<VodInfo.VodSeries>> entry : mVodInfo.seriesMap.entrySet()) {
+            if (entry.getKey().toLowerCase().contains("m3u8")) {
+                continue;
+            }
+            java.util.List<VodInfo.VodSeries> list = entry.getValue();
+            if (list != null && index < list.size()) {
+                String url = list.get(index).url;
+                if (DefaultConfig.isDyttShareUrl(url)) {
+                    return url;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void doParseDyttShare(final String shareUrl) {
+        stopParse();
+        setTip("正在解析播放地址", true, false);
+        OkGo.<String>get(shareUrl)
+                .tag("dytt_share")
+                .headers("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .headers("Referer", "https://www.dyttzy.tv/")
+                .execute(new AbsCallback<String>() {
+                    @Override
+                    public String convertResponse(okhttp3.Response response) throws Throwable {
+                        if (response.body() != null) {
+                            return response.body().string();
+                        }
+                        throw new IllegalStateException("网络请求错误");
+                    }
+
+                    @Override
+                    public void onSuccess(Response<String> response) {
+                        String m3u8 = DefaultConfig.parseDyttShareM3u8(response.body(), shareUrl);
+                        if (m3u8 != null) {
+                            mController.showParse(false);
+                            playUrl(m3u8, DefaultConfig.buildDyttPlayHeaders(shareUrl));
+                        } else {
+                            errorWithRetry("解析错误", false);
+                        }
+                    }
+
+                    @Override
+                    public void onError(Response<String> response) {
+                        super.onError(response);
+                        errorWithRetry("解析错误", false);
+                    }
+                });
     }
 
     private String playSubtitle;
@@ -496,10 +610,23 @@ public class PlayActivity extends BaseActivity {
     private void initParse(String flag, boolean useParse, String playUrl, final String url) {
         parseFlag = flag;
         webUrl = url;
+        if (DefaultConfig.isDyttShareUrl(url)) {
+            mController.showParse(false);
+            doParseDyttShare(url);
+            return;
+        }
         ParseBean parseBean = null;
         mController.showParse(useParse);
         if (useParse) {
             parseBean = ApiConfig.get().getDefaultParse();
+            if (parseBean != null && parseBean.getType() == 3) {
+                for (ParseBean pb : ApiConfig.get().getParseBeanList()) {
+                    if (pb.getType() == 1) {
+                        parseBean = pb;
+                        break;
+                    }
+                }
+            }
         } else {
             if (playUrl.startsWith("json:")) {
                 parseBean = new ParseBean();
@@ -513,10 +640,19 @@ public class PlayActivity extends BaseActivity {
                         break;
                     }
                 }
+            } else if (playUrl.isEmpty()) {
+                ParseBean defaultParse = ApiConfig.get().getDefaultParse();
+                if (defaultParse != null && defaultParse.getType() == 1) {
+                    parseBean = defaultParse;
+                }
             }
             if (parseBean == null) {
                 parseBean = new ParseBean();
-                parseBean.setType(0);
+                if (!playUrl.isEmpty() && (playUrl.contains("url=") || playUrl.endsWith("="))) {
+                    parseBean.setType(1);
+                } else {
+                    parseBean.setType(0);
+                }
                 parseBean.setUrl(playUrl);
             }
         }
@@ -554,6 +690,7 @@ public class PlayActivity extends BaseActivity {
         stopLoadWebView(false);
         loadFound = false;
         OkGo.getInstance().cancelTag("json_jx");
+        OkGo.getInstance().cancelTag("dytt_share");
         if (parseThreadPool != null) {
             try {
                 parseThreadPool.shutdown();
