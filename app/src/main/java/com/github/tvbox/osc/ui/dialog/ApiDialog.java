@@ -78,6 +78,10 @@ public class ApiDialog extends BaseDialog {
             @Override
             public void del(StoreBean store) {
                 StoreConfigHelper.removeStore(store.url);
+                if (TextUtils.isEmpty(Hawk.get(HawkConfig.API_URL, ""))) {
+                    inputName.setText("");
+                    inputUrl.setText("");
+                }
                 refreshStoreList();
             }
         });
@@ -107,6 +111,28 @@ public class ApiDialog extends BaseDialog {
                 return true;
             }
             return false;
+        });
+        storeList.setOnItemListener(new TvRecyclerView.OnItemListener() {
+            @Override
+            public void onItemPreSelected(TvRecyclerView parent, View itemView, int position) {
+            }
+
+            @Override
+            public void onItemSelected(TvRecyclerView parent, View itemView, int position) {
+            }
+
+            @Override
+            public void onItemClick(TvRecyclerView parent, View itemView, int position) {
+                View focus = itemView.findFocus();
+                if (focus != null && focus.getId() == R.id.tvDel) {
+                    focus.performClick();
+                    return;
+                }
+                View nameView = itemView.findViewById(R.id.tvName);
+                if (nameView != null) {
+                    nameView.performClick();
+                }
+            }
         });
         inputName.setOnKeyListener((v, keyCode, event) -> {
             if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_UP) {

@@ -121,6 +121,14 @@ public class StoreConfigHelper {
         ArrayList<String> history = Hawk.get(HawkConfig.API_HISTORY, new ArrayList<String>());
         history.remove(url);
         Hawk.put(HawkConfig.API_HISTORY, history);
+        String currentUrl = Hawk.get(HawkConfig.API_URL, "");
+        String indexUrl = Hawk.get(HawkConfig.API_INDEX_URL, "");
+        if (url.equals(currentUrl) || url.equals(indexUrl)) {
+            Hawk.put(HawkConfig.API_URL, "");
+            Hawk.put(HawkConfig.API_INDEX_URL, "");
+            Hawk.put(HawkConfig.API_LINE_NAME, "");
+            Hawk.put(HawkConfig.API_LINE_LIST, "");
+        }
     }
 
     public static void selectStore(StoreBean store) {

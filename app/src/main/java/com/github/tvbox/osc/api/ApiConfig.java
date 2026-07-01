@@ -39,7 +39,9 @@ import com.orhanobut.hawk.Hawk;
 
 import org.json.JSONObject;
 
+import com.github.tvbox.osc.util.ConfigTextExtractor;
 import com.github.tvbox.osc.util.StoreConfigHelper;
+import com.github.tvbox.osc.util.UrlHelper;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -117,13 +119,13 @@ public class ApiConfig {
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(apiUrl));
         if (useCache && cache.exists() && SettingUiHelper.isConfigCacheValid(cache)) {
             try {
-                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity, generation);
+                handleConfigJson(apiUrl, ConfigTextExtractor.extract(readCache(cache)), useCache, callback, activity, generation);
                 return;
             } catch (Throwable th) {
                 th.printStackTrace();
             }
         }
-        String apiFix = apiUrl;
+        String apiFix = UrlHelper.normalizeRequestUrl(apiUrl);
         if (apiUrl.startsWith("clan://")) {
             apiFix = clanToAddress(apiUrl);
         }
@@ -153,7 +155,12 @@ public class ApiConfig {
                         } catch (Throwable th) {
                             th.printStackTrace();
                             if (!isLoadStale(generation)) {
-                                callback.error("解析配置失败");
+                                String body = response.body();
+                                if (UrlHelper.looksLikeHtml(body)) {
+                                    callback.error("该地址返回网页而非配置文件\n请检查线路地址是否完整（如缺少 /tv 路径）");
+                                } else {
+                                    callback.error("解析配置失败");
+                                }
                             }
                         }
                     }
@@ -166,7 +173,7 @@ public class ApiConfig {
                         }
                         if (cache.exists()) {
                             try {
-                                handleConfigJson(apiUrl, readCache(cache), useCache, callback, activity, generation);
+                                handleConfigJson(apiUrl, ConfigTextExtractor.extract(readCache(cache)), useCache, callback, activity, generation);
                                 return;
                             } catch (Throwable th) {
                                 th.printStackTrace();
@@ -176,16 +183,15 @@ public class ApiConfig {
                     }
 
                     public String convertResponse(okhttp3.Response response) throws Throwable {
-                        String result = "";
                         if (response.body() == null) {
-                            result = "";
-                        } else {
-                            result = response.body().string();
+                            return "";
                         }
+                        byte[] bytes = response.body().bytes();
                         if (apiUrl.startsWith("clan")) {
-                            result = clanContentFix(clanToAddress(apiUrl), result);
+                            String fixed = clanContentFix(clanToAddress(apiUrl), new String(bytes, "UTF-8"));
+                            return ConfigTextExtractor.extract(fixed);
                         }
-                        return result;
+                        return ConfigTextExtractor.extract(bytes);
                     }
                 });
     }
@@ -247,7 +253,7 @@ public class ApiConfig {
                 if (!url.isEmpty()) {
                     UrlIndexItem item = new UrlIndexItem();
                     item.name = name;
-                    item.url = url;
+                    item.url = UrlHelper.normalizeRequestUrl(url);
                     list.add(item);
                 }
             } catch (Throwable ignored) {

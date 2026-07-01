@@ -86,13 +86,17 @@ public class StoreDialogAdapter extends ListAdapter<StoreBean, StoreDialogAdapte
             dialogInterface.click(store);
         });
         holder.itemView.findViewById(R.id.tvDel).setOnClickListener(v -> {
-            if (selectedUrl.equals(store.url)) {
+            int index = holder.getAdapterPosition();
+            if (index < 0 || index >= data.size()) {
                 return;
             }
-            int index = data.indexOf(store);
-            data.remove(store);
+            StoreBean target = data.get(index);
+            if (selectedUrl.equals(target.url)) {
+                selectedUrl = "";
+            }
+            data.remove(index);
             notifyItemRemoved(index);
-            dialogInterface.del(store);
+            dialogInterface.del(target);
         });
     }
 
