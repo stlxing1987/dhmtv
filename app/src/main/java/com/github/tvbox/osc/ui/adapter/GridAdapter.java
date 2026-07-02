@@ -2,21 +2,18 @@ package com.github.tvbox.osc.ui.adapter;
 
 import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.Movie;
-import com.github.tvbox.osc.picasso.RoundTransformation;
-import com.github.tvbox.osc.util.DefaultConfig;
-import com.github.tvbox.osc.util.MD5;
-import com.squareup.picasso.Picasso;
+import com.github.tvbox.osc.util.MobileUiHelper;
 
 import java.util.ArrayList;
-
-import me.jessyan.autosize.utils.AutoSizeUtils;
 
 /**
  * @author pj567
@@ -24,8 +21,14 @@ import me.jessyan.autosize.utils.AutoSizeUtils;
  * @description:
  */
 public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
+    private int previewWidth;
+
     public GridAdapter() {
-        super(R.layout.item_grid, new ArrayList<>());
+        super(MobileUiHelper.getGridItemLayout(App.getInstance()), new ArrayList<>());
+    }
+
+    public void setPreviewWidth(int previewWidth) {
+        this.previewWidth = previewWidth;
     }
 
     @Override
@@ -39,20 +42,8 @@ public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
         }
         TextView tvLang = helper.getView(R.id.tvLang);
         tvLang.setVisibility(View.GONE);
-        /*if (TextUtils.isEmpty(item.lang)) {
-            tvLang.setVisibility(View.GONE);
-        } else {
-            tvLang.setText(item.lang);
-            tvLang.setVisibility(View.VISIBLE);
-        }*/
         TextView tvArea = helper.getView(R.id.tvArea);
         tvArea.setVisibility(View.GONE);
-        /*if (TextUtils.isEmpty(item.area)) {
-            tvArea.setVisibility(View.GONE);
-        } else {
-            tvArea.setText(item.area);
-            tvArea.setVisibility(View.VISIBLE);
-        }*/
         if (TextUtils.isEmpty(item.note)) {
             helper.setVisible(R.id.tvNote, false);
         } else {
@@ -62,19 +53,16 @@ public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
         helper.setText(R.id.tvName, item.name);
         helper.setText(R.id.tvActor, item.actor);
         ImageView ivThumb = helper.getView(R.id.ivThumb);
-        //由于部分电视机使用glide报错
-        if (!TextUtils.isEmpty(item.pic)) {
-            Picasso.get()
-                    .load(DefaultConfig.checkReplaceProxy(item.pic))
-                    .transform(new RoundTransformation(MD5.string2MD5(item.pic + "position=" + helper.getLayoutPosition()))
-                            .centerCorp(true)
-                            .override(AutoSizeUtils.mm2px(mContext, 300), AutoSizeUtils.mm2px(mContext, 400))
-                            .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
-                    .placeholder(R.drawable.img_loading_placeholder)
-                    .error(R.drawable.img_loading_placeholder)
-                    .into(ivThumb);
-        } else {
-            ivThumb.setImageResource(R.drawable.img_loading_placeholder);
+        String cacheKey = item.pic + "position=" + helper.getLayoutPosition();
+        MobileUiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
+        if (previewWidth > 0) {
+            ViewGroup.LayoutParams lp = helper.itemView.getLayoutParams();
+            if (lp == null) {
+                lp = new ViewGroup.LayoutParams(previewWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+            } else {
+                lp.width = previewWidth;
+            }
+            helper.itemView.setLayoutParams(lp);
         }
     }
 }

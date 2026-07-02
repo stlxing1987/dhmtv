@@ -6,6 +6,7 @@ import com.github.tvbox.osc.callback.EmptyCallback;
 import com.github.tvbox.osc.callback.LoadingCallback;
 import com.github.tvbox.osc.data.AppDataManager;
 import com.github.tvbox.osc.server.ControlManager;
+import com.github.tvbox.osc.util.DeviceHelper;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.OkGoHelper;
 import com.github.tvbox.osc.util.PinyinSearchHelper;
@@ -30,6 +31,7 @@ public class App extends MultiDexApplication {
         super.onCreate();
         instance = this;
         initParams();
+        DeviceHelper.initDeviceMode(this);
         // OKGo
         OkGoHelper.init();
         // 初始化Web服务器

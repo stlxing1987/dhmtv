@@ -6,19 +6,15 @@ import android.widget.ImageView;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.cache.VodCollect;
-import com.github.tvbox.osc.picasso.RoundTransformation;
-import com.github.tvbox.osc.util.DefaultConfig;
-import com.github.tvbox.osc.util.MD5;
-import com.squareup.picasso.Picasso;
+import com.github.tvbox.osc.util.MobileUiHelper;
 
 import java.util.ArrayList;
 
-import me.jessyan.autosize.utils.AutoSizeUtils;
-
 public class CollectAdapter extends BaseQuickAdapter<VodCollect, BaseViewHolder> {
     public CollectAdapter() {
-        super(R.layout.item_grid, new ArrayList<>());
+        super(MobileUiHelper.getGridItemLayout(App.getInstance()), new ArrayList<>());
     }
 
     @Override
@@ -29,19 +25,7 @@ public class CollectAdapter extends BaseQuickAdapter<VodCollect, BaseViewHolder>
         helper.setVisible(R.id.tvNote, false);
         helper.setText(R.id.tvName, item.name);
         ImageView ivThumb = helper.getView(R.id.ivThumb);
-        //由于部分电视机使用glide报错
-        if (!TextUtils.isEmpty(item.pic)) {
-            Picasso.get()
-                    .load(DefaultConfig.checkReplaceProxy(item.pic))
-                    .transform(new RoundTransformation(MD5.string2MD5(item.pic + item.name))
-                            .centerCorp(true)
-                            .override(AutoSizeUtils.mm2px(mContext, 300), AutoSizeUtils.mm2px(mContext, 400))
-                            .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
-                    .placeholder(R.drawable.img_loading_placeholder)
-                    .error(R.drawable.img_loading_placeholder)
-                    .into(ivThumb);
-        } else {
-            ivThumb.setImageResource(R.drawable.img_loading_placeholder);
-        }
+        String cacheKey = item.pic + item.name;
+        MobileUiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
     }
 }

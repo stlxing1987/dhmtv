@@ -165,7 +165,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
             }
         });
         tvHotList.setAdapter(homeHotVodAdapter);
-        tvHotList.setLayoutManager(new V7GridLayoutManager(mContext, Hawk.get(HawkConfig.HOME_GRID_COLS, 6)));
+        tvHotList.setLayoutManager(new V7GridLayoutManager(mContext, Hawk.get(HawkConfig.HOME_GRID_COLS, 5)));
 
         initHomeHotVod(homeHotVodAdapter);
     }

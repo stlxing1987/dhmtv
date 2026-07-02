@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent"
+    android:padding="@dimen/mobile_space_xs">
+
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintDimensionRatio="110:148"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/ivThumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/mobile_space_xs"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvYear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/mobile_space_xs"
+                android:background="@drawable/shape_thumb_year"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingLeft="@dimen/mobile_space_xs"
+                android:paddingRight="@dimen/mobile_space_xs"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/mobile_badge_text" />
+
+            <TextView
+                android:id="@+id/tvArea"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/mobile_space_xs"
+                android:background="@drawable/shape_thumb_lang"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingLeft="@dimen/mobile_space_xs"
+                android:paddingRight="@dimen/mobile_space_xs"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/mobile_badge_text" />
+
+            <TextView
+                android:id="@+id/tvLang"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/shape_thumb_year"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingLeft="@dimen/mobile_space_xs"
+                android:paddingRight="@dimen/mobile_space_xs"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/mobile_badge_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvNote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="@dimen/mobile_space_xs"
+                android:layout_marginRight="@dimen/mobile_space_xs"
+                android:layout_marginBottom="@dimen/mobile_space_xs"
+                android:background="@drawable/shape_thumb_note"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingLeft="@dimen/mobile_space_xs"
+                android:paddingRight="@dimen/mobile_space_xs"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/mobile_badge_text" />
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/shape_thumb_bottom_name"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:padding="@dimen/mobile_space_xs"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/mobile_name_text" />
+
+            <TextView
+                android:id="@+id/tvActor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/shape_thumb_bottom_name"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:padding="@dimen/mobile_space_xs"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/mobile_actor_text"
+                android:visibility="gone" />
+        </LinearLayout>
+    </FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

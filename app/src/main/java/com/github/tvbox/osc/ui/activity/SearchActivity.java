@@ -3,7 +3,9 @@ package com.github.tvbox.osc.ui.activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -29,6 +31,7 @@ import com.github.tvbox.osc.ui.tv.QRCodeGen;
 import com.github.tvbox.osc.ui.tv.widget.SearchKeyboard;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.MobileUiHelper;
 import com.github.tvbox.osc.util.PinyinSearchHelper;
 import com.github.tvbox.osc.util.SearchSuggestHelper;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
@@ -78,10 +81,12 @@ public class SearchActivity extends BaseActivity {
     private String searchTitle = "";
     private final ArrayList<String> searchCorpus = new ArrayList<>();
     private List<String> searchKeywords = new ArrayList<>();
+    private boolean mobileUi;
 
     @Override
     protected int getLayoutResID() {
-        return R.layout.activity_search;
+        mobileUi = MobileUiHelper.useMobileUi(this);
+        return mobileUi ? R.layout.activity_search_mobile : R.layout.activity_search;
     }
 
     @Override
@@ -119,7 +124,25 @@ public class SearchActivity extends BaseActivity {
         keyboard = findViewById(R.id.keyBoardRoot);
         mGridViewWord = findViewById(R.id.mGridViewWord);
         mGridViewWord.setHasFixedSize(true);
-        mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
+        if (mobileUi) {
+            mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
+            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, MobileUiHelper.getHomeGridColumns(this)));
+            View btnBack = findViewById(R.id.btnBack);
+            if (btnBack != null) {
+                btnBack.setOnClickListener(v -> finish());
+            }
+            etSearch.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == EditorInfo.IME_ACTION_SEARCH
+                        || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+                    triggerSearch();
+                    return true;
+                }
+                return false;
+            });
+        } else {
+            mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
+            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 3));
+        }
         wordAdapter = new PinyinAdapter();
         mGridViewWord.setAdapter(wordAdapter);
         wordAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
@@ -129,7 +152,6 @@ public class SearchActivity extends BaseActivity {
             }
         });
         mGridView.setHasFixedSize(true);
-        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 3));
         searchAdapter = new SearchAdapter();
         mGridView.setAdapter(searchAdapter);
         searchAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
@@ -157,12 +179,7 @@ public class SearchActivity extends BaseActivity {
             @Override
             public void onClick(View v) {
                 FastClickCheckUtil.check(v);
-                String wd = etSearch.getText().toString().trim();
-                if (!TextUtils.isEmpty(wd)) {
-                    search(wd);
-                } else {
-                    Toast.makeText(mContext, "输入内容不能为空", Toast.LENGTH_SHORT).show();
-                }
+                triggerSearch();
             }
         });
         tvClear.setOnClickListener(new View.OnClickListener() {
@@ -172,7 +189,8 @@ public class SearchActivity extends BaseActivity {
                 etSearch.setText("");
             }
         });
-        keyboard.setOnSearchKeyListener(new SearchKeyboard.OnSearchKeyListener() {
+        if (keyboard != null && keyboard.getVisibility() == View.VISIBLE) {
+            keyboard.setOnSearchKeyListener(new SearchKeyboard.OnSearchKeyListener() {
             @Override
             public void onSearchKey(int pos, String key) {
                 if (pos > 1) {
@@ -196,8 +214,18 @@ public class SearchActivity extends BaseActivity {
                     remoteDialog.show();
                 }
             }
-        });
+            });
+        }
         setLoadSir(llLayout);
+    }
+
+    private void triggerSearch() {
+        String wd = etSearch.getText().toString().trim();
+        if (!TextUtils.isEmpty(wd)) {
+            search(wd);
+        } else {
+            Toast.makeText(mContext, "输入内容不能为空", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void initViewModel() {
@@ -260,10 +288,15 @@ public class SearchActivity extends BaseActivity {
     }
 
     private void initData() {
-        refreshQRCode();
+        if (!mobileUi) {
+            refreshQRCode();
+        }
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("title")) {
             String title = intent.getStringExtra("title");
+            if (etSearch != null && !TextUtils.isEmpty(title)) {
+                etSearch.setText(title);
+            }
             showLoading();
             search(title);
         }
@@ -376,7 +409,9 @@ public class SearchActivity extends BaseActivity {
             return;
         }
         showEmpty();
-        Toast.makeText(mContext, "未识别简拼「" + latin + "」，请从左侧选择片名", Toast.LENGTH_LONG).show();
+        Toast.makeText(mContext, mobileUi
+                ? "未识别简拼「" + latin + "」，请从上方选择片名"
+                : "未识别简拼「" + latin + "」，请从左侧选择片名", Toast.LENGTH_LONG).show();
     }
 
     private ExecutorService searchExecutorService = null;
@@ -461,7 +496,9 @@ public class SearchActivity extends BaseActivity {
             if (searchAdapter.getData().size() <= 0) {
                 showEmpty();
                 if (searchTitle != null && PinyinSearchHelper.isLatinInput(searchTitle)) {
-                    Toast.makeText(mContext, "简拼「" + searchTitle + "」未搜到结果，可尝试左侧推荐片名", Toast.LENGTH_LONG).show();
+                    Toast.makeText(mContext, mobileUi
+                            ? "简拼「" + searchTitle + "」未搜到结果，可尝试上方推荐片名"
+                            : "简拼「" + searchTitle + "」未搜到结果，可尝试左侧推荐片名", Toast.LENGTH_LONG).show();
                 }
             }
             cancel();

@@ -17,6 +17,8 @@ import androidx.core.content.PermissionChecker;
 import com.github.tvbox.osc.callback.EmptyCallback;
 import com.github.tvbox.osc.callback.LoadingCallback;
 import com.github.tvbox.osc.util.AppManager;
+import com.github.tvbox.osc.util.DeviceHelper;
+import com.github.tvbox.osc.util.DeviceHelper;
 import com.kingja.loadsir.callback.Callback;
 import com.kingja.loadsir.core.LoadService;
 import com.kingja.loadsir.core.LoadSir;
@@ -52,6 +54,7 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
         } catch (Throwable th) {
             th.printStackTrace();
         }
+        setRequestedOrientation(DeviceHelper.getScreenOrientation(this));
         super.onCreate(savedInstanceState);
         setContentView(getLayoutResID());
         mContext = this;
@@ -66,6 +69,9 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
     }
 
     public void hideSysBar() {
+        if (DeviceHelper.isPhone(this)) {
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             int uiOptions = getWindow().getDecorView().getSystemUiVisibility();
             uiOptions |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
@@ -163,7 +169,9 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
 
     @Override
     public float getSizeInDp() {
-        return isBaseOnWidth() ? 1280 : 720;
+        return isBaseOnWidth()
+                ? DeviceHelper.getDesignWidthDp(this)
+                : DeviceHelper.getDesignHeightDp(this);
     }
 
     @Override

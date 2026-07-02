@@ -27,10 +27,12 @@ import com.github.tvbox.osc.ui.dialog.XWalkInitDialog;
 import com.github.tvbox.osc.util.ConfigDialogHelper;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.MobileUiHelper;
 import com.github.tvbox.osc.util.OkGoHelper;
 import com.github.tvbox.osc.util.PlayerHelper;
 import com.github.tvbox.osc.util.SettingUiHelper;
 import com.github.tvbox.osc.util.StoreConfigHelper;
+import com.github.tvbox.osc.util.UiModeSwitcher;
 import com.orhanobut.hawk.Hawk;
 
 import org.jetbrains.annotations.NotNull;
@@ -58,7 +60,9 @@ public class ModelSettingFragment extends BaseLazyFragment {
 
     @Override
     protected int getLayoutResID() {
-        return R.layout.fragment_model;
+        return MobileUiHelper.useMobileUi(mContext)
+                ? R.layout.fragment_model_mobile
+                : R.layout.fragment_model;
     }
 
     @Override
@@ -117,11 +121,13 @@ public class ModelSettingFragment extends BaseLazyFragment {
         setCellLabel(R.id.llHomeGridCols, "首页列数");
         setCellLabel(R.id.llAbout, "关于");
         setCellLabel(R.id.llUiMode, "操作偏好");
-        setWideCell(R.id.llApi);
-        setWideCell(R.id.llLineSwitch);
-        setWideCell(R.id.llLiveApi);
-        setWideCell(R.id.llHomePref);
-        setWideCell(R.id.llUiMode);
+        if (!MobileUiHelper.useMobileUi(mContext)) {
+            setWideCell(R.id.llApi);
+            setWideCell(R.id.llLineSwitch);
+            setWideCell(R.id.llLiveApi);
+            setWideCell(R.id.llHomePref);
+            setWideCell(R.id.llUiMode);
+        }
         hideCellValue(R.id.llChangeWallpaper);
         hideCellValue(R.id.llResetWallpaper);
         hideCellValue(R.id.llBackup);
@@ -153,7 +159,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         setCellValue(R.id.llParseWebVew, Hawk.get(HawkConfig.PARSE_WEBVIEW, true) ? "系统自带" : "XWalkView");
         SourceBean home = ApiConfig.get().getHomeSourceBean();
         setCellValue(R.id.llHomeApi, home != null ? home.getName() : "");
-        setCellValue(R.id.llHomeGridCols, SettingUiHelper.getHomeGridColsName(Hawk.get(HawkConfig.HOME_GRID_COLS, 6)));
+        setCellValue(R.id.llHomeGridCols, SettingUiHelper.getHomeGridColsName(Hawk.get(HawkConfig.HOME_GRID_COLS, 5)));
         setCellValue(R.id.llAbout, "V" + getAppVersionName());
         setCellValue(R.id.llUiMode, SettingUiHelper.getUiModeName(Hawk.get(HawkConfig.UI_MODE, 0)));
     }
@@ -424,7 +430,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         });
         findViewById(R.id.llHomeGridCols).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
-            showIntSelect("请选择首页数据源列数", intArray(4, 5, 6, 7, 8), Hawk.get(HawkConfig.HOME_GRID_COLS, 6),
+            showIntSelect("请选择首页数据源列数", intArray(3, 4, 5, 6, 7, 8), Hawk.get(HawkConfig.HOME_GRID_COLS, 5),
                     SettingUiHelper::getHomeGridColsName, val -> {
                         Hawk.put(HawkConfig.HOME_GRID_COLS, val);
                         Toast.makeText(mContext, "重新进入首页后生效", Toast.LENGTH_SHORT).show();
@@ -437,10 +443,10 @@ public class ModelSettingFragment extends BaseLazyFragment {
         });
         findViewById(R.id.llUiMode).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
-            showIntSelect("请选择操作偏好", intArray(0, 1), Hawk.get(HawkConfig.UI_MODE, 0),
+            showIntSelect("请选择操作偏好", intArray(0, 1, 2), Hawk.get(HawkConfig.UI_MODE, 0),
                     SettingUiHelper::getUiModeName, val -> {
-                        Hawk.put(HawkConfig.UI_MODE, val);
                         refreshValues();
+                        UiModeSwitcher.apply(mActivity, val);
                     });
         });
     }

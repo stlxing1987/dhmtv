@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="@dimen/mobile_space_lg">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/llDebug"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm"
+                android:background="@drawable/shape_mobile_search"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="@dimen/mobile_space_lg"
+                android:paddingRight="@dimen/mobile_space_lg"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="调试模式"
+                    android:textColor="@android:color/white"
+                    android:textSize="@dimen/mobile_text_md" />
+
+                <TextView
+                    android:id="@+id/tvDebugOpen"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="@dimen/mobile_text_sm" />
+            </LinearLayout>
+
+            <include
+                android:id="@+id/llApi"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llLineSwitch"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llLiveApi"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llHomePref"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llHomeRec"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llHomeTab"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llSearchView"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llCacheDays"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llPlay"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llMediaCodec"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llWindowPreview"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llScale"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llChangeWallpaper"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llResetWallpaper"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llDns"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llHistoryCount"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llSearchThread"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llRender"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llExoBuffer"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llThunderCache"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llBackup"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llClearCache"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llExoCache"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llResetApp"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llParseWebVew"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llHomeApi"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llHomeGridCols"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llAbout"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llUiMode"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

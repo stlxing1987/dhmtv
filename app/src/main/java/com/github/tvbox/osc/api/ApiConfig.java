@@ -77,6 +77,17 @@ public class ApiConfig {
 
     private JarLoader jarLoader = new JarLoader();
     private int loadGeneration = 0;
+    private boolean suppressUrlIndexDialog = false;
+
+    public interface UrlIndexCallback {
+        void onSuccess(List<UrlIndexItem> items);
+
+        void onError(String msg);
+    }
+
+    public void setSuppressUrlIndexDialog(boolean suppress) {
+        suppressUrlIndexDialog = suppress;
+    }
 
     public void cancelPendingLoad() {
         loadGeneration++;
@@ -363,6 +374,91 @@ public class ApiConfig {
         applyUrlIndexSelection(item);
     }
 
+    public void fetchUrlIndexList(String storeUrl, UrlIndexCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        if (TextUtils.isEmpty(storeUrl)) {
+            postUrlIndexCallback(callback, new ArrayList<>(), null);
+            return;
+        }
+        String indexUrl = Hawk.get(HawkConfig.API_INDEX_URL, "");
+        String currentApi = Hawk.get(HawkConfig.API_URL, "");
+        if (storeUrl.equals(indexUrl) || storeUrl.equals(currentApi)) {
+            List<UrlIndexItem> cached = getUrlIndexList();
+            if (!cached.isEmpty()) {
+                postUrlIndexCallback(callback, cached, null);
+                return;
+            }
+        }
+        String apiFix = UrlHelper.normalizeRequestUrl(storeUrl);
+        if (storeUrl.startsWith("clan://")) {
+            apiFix = clanToAddress(storeUrl);
+        }
+        OkGo.<String>get(apiFix).execute(new AbsCallback<String>() {
+            @Override
+            public void onSuccess(Response<String> response) {
+                try {
+                    String json = response.body();
+                    postUrlIndexCallback(callback, parseUrlIndexResponse(json, storeUrl), null);
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                    postUrlIndexCallback(callback, buildSingleLine(storeUrl), null);
+                }
+            }
+
+            @Override
+            public void onError(Response<String> response) {
+                super.onError(response);
+                postUrlIndexCallback(callback, buildSingleLine(storeUrl), null);
+            }
+
+            @Override
+            public String convertResponse(okhttp3.Response response) throws Throwable {
+                if (response.body() == null) {
+                    return "";
+                }
+                byte[] bytes = response.body().bytes();
+                if (storeUrl.startsWith("clan://")) {
+                    String fixed = clanContentFix(clanToAddress(storeUrl), new String(bytes, "UTF-8"));
+                    return ConfigTextExtractor.extract(fixed);
+                }
+                return ConfigTextExtractor.extract(bytes);
+            }
+        });
+    }
+
+    private List<UrlIndexItem> parseUrlIndexResponse(String jsonStr, String storeUrl) {
+        jsonStr = normalizeJson(jsonStr);
+        if (TextUtils.isEmpty(jsonStr)) {
+            return buildSingleLine(storeUrl);
+        }
+        JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
+        if (isUrlIndex(infoJson)) {
+            return parseUrlIndex(infoJson);
+        }
+        return buildSingleLine(storeUrl);
+    }
+
+    private List<UrlIndexItem> buildSingleLine(String storeUrl) {
+        List<UrlIndexItem> list = new ArrayList<>();
+        UrlIndexItem item = new UrlIndexItem();
+        item.name = StoreConfigHelper.buildDefaultName(storeUrl);
+        item.url = UrlHelper.normalizeRequestUrl(storeUrl);
+        list.add(item);
+        return list;
+    }
+
+    private void postUrlIndexCallback(UrlIndexCallback callback, List<UrlIndexItem> items, String error) {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (!TextUtils.isEmpty(error)) {
+                callback.onError(error);
+            } else {
+                callback.onSuccess(items == null ? new ArrayList<>() : items);
+            }
+        });
+    }
+
     private void showUrlIndexDialog(Activity activity, List<UrlIndexItem> items, boolean useCache, LoadConfigCallback callback, int generation) {
         if (isLoadStale(generation)) {
             return;
@@ -373,6 +469,16 @@ public class ApiConfig {
         }
         if (items.size() == 1) {
             applyUrlIndexSelection(items.get(0));
+            loadConfig(useCache, callback, activity);
+            return;
+        }
+        if (suppressUrlIndexDialog) {
+            suppressUrlIndexDialog = false;
+            UrlIndexItem selected = resolveUrlIndexItem(items);
+            if (selected == null) {
+                selected = items.get(0);
+            }
+            applyUrlIndexSelection(selected);
             loadConfig(useCache, callback, activity);
             return;
         }

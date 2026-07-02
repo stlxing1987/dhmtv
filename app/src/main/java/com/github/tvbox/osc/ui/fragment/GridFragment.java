@@ -18,6 +18,8 @@ import com.github.tvbox.osc.ui.adapter.GridAdapter;
 import com.github.tvbox.osc.ui.dialog.GridFilterDialog;
 import com.github.tvbox.osc.ui.tv.widget.LoadMoreView;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
+import com.github.tvbox.osc.util.HawkConfig;
+import com.orhanobut.hawk.Hawk;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
 import com.owen.tvrecyclerview.widget.V7GridLayoutManager;
@@ -64,7 +66,7 @@ public class GridFragment extends BaseLazyFragment {
         mGridView.setHasFixedSize(true);
         gridAdapter = new GridAdapter();
         mGridView.setAdapter(gridAdapter);
-        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, isBaseOnWidth() ? 5 : 6));
+        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, Hawk.get(HawkConfig.HOME_GRID_COLS, 5)));
         gridAdapter.setOnLoadMoreListener(new BaseQuickAdapter.RequestLoadMoreListener() {
             @Override
             public void onLoadMoreRequested() {

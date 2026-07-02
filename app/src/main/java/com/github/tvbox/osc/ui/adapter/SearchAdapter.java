@@ -7,20 +7,16 @@ import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
+import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.Movie;
 import com.github.tvbox.osc.bean.SourceBean;
-import com.github.tvbox.osc.picasso.RoundTransformation;
-import com.github.tvbox.osc.util.DefaultConfig;
-import com.github.tvbox.osc.util.MD5;
-import com.squareup.picasso.Picasso;
+import com.github.tvbox.osc.util.MobileUiHelper;
 
 import java.util.ArrayList;
 
-import me.jessyan.autosize.utils.AutoSizeUtils;
-
 public class SearchAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
     public SearchAdapter() {
-        super(R.layout.item_search, new ArrayList<>());
+        super(MobileUiHelper.getSearchItemLayout(App.getInstance()), new ArrayList<>());
     }
 
     @Override
@@ -35,18 +31,7 @@ public class SearchAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder>
             helper.setText(R.id.tvNote, item.note);
         }
         ImageView ivThumb = helper.getView(R.id.ivThumb);
-        if (!TextUtils.isEmpty(item.pic)) {
-            Picasso.get()
-                    .load(DefaultConfig.checkReplaceProxy(item.pic))
-                    .transform(new RoundTransformation(MD5.string2MD5(item.pic + "position=" + helper.getLayoutPosition()))
-                            .centerCorp(true)
-                            .override(AutoSizeUtils.mm2px(mContext, 300), AutoSizeUtils.mm2px(mContext, 400))
-                            .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
-                    .placeholder(R.drawable.img_loading_placeholder)
-                    .error(R.drawable.img_loading_placeholder)
-                    .into(ivThumb);
-        } else {
-            ivThumb.setImageResource(R.drawable.img_loading_placeholder);
-        }
+        String cacheKey = item.pic + "position=" + helper.getLayoutPosition();
+        MobileUiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
     }
 }

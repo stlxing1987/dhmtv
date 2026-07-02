@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/shape_mobile_sheet_bg"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/mobile_space_lg">
+
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="@dimen/mobile_space_sm"
+        android:background="#DDDDDD" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/mobile_space_lg"
+        android:paddingRight="@dimen/mobile_space_lg">
+
+        <ImageView
+            android:id="@+id/btnRefresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="刷新"
+            android:padding="4dp"
+            android:src="@drawable/ic_refresh" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="仓库管理"
+            android:textColor="#333333"
+            android:textSize="@dimen/mobile_text_title"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnAdd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/mobile_space_sm"
+            android:text="添加"
+            android:textColor="@color/color_0CADE2"
+            android:textSize="@dimen/mobile_text_lg" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/mobile_space_lg"
+        android:paddingRight="@dimen/mobile_space_lg">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvStores"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#11000000" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="#22000000" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvLines"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#08000000" />
+    </LinearLayout>
+</LinearLayout>

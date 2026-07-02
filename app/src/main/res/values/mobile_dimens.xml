@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="mobile_space_xs">4dp</dimen>
+    <dimen name="mobile_space_sm">8dp</dimen>
+    <dimen name="mobile_space_md">12dp</dimen>
+    <dimen name="mobile_space_lg">16dp</dimen>
+    <dimen name="mobile_text_sm">12sp</dimen>
+    <dimen name="mobile_text_md">14sp</dimen>
+    <dimen name="mobile_text_lg">16sp</dimen>
+    <dimen name="mobile_text_title">18sp</dimen>
+    <dimen name="mobile_top_bar">56dp</dimen>
+    <dimen name="mobile_bottom_nav">56dp</dimen>
+    <dimen name="mobile_search_height">36dp</dimen>
+    <dimen name="mobile_tab_height">40dp</dimen>
+    <dimen name="mobile_cell_height">48dp</dimen>
+    <dimen name="mobile_poster_radius">6dp</dimen>
+    <dimen name="mobile_badge_text">10sp</dimen>
+    <dimen name="mobile_name_text">12sp</dimen>
+    <dimen name="mobile_actor_text">11sp</dimen>
+    <dimen name="mobile_hot_chip_h">32dp</dimen>
+</resources>
