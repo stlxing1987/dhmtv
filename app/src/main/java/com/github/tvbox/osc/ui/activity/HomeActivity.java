@@ -18,6 +18,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager.widget.ViewPager;
@@ -103,6 +104,8 @@ public class HomeActivity extends BaseActivity {
         dataInitOk = false;
         jarInitOk = false;
         homeSourceFallbackTried = false;
+        currentSelected = 0;
+        sortFocused = 0;
         ApiConfig.get().cancelPendingLoad();
         mHandler.post(this::initData);
     }
@@ -387,31 +390,64 @@ public class HomeActivity extends BaseActivity {
     }
 
     private void initViewPager(AbsSortXml absXml) {
-        if (sortAdapter.getData().size() > 0) {
-            for (MovieSort.SortData data : sortAdapter.getData()) {
-                if (data.id.equals("my0")) {
-                    if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && absXml != null && absXml.videoList != null && absXml.videoList.size() > 0) {
-                        fragments.add(UserFragment.newInstance(absXml.videoList));
-                    } else {
-                        fragments.add(UserFragment.newInstance(null));
-                    }
+        clearHomeFragments();
+        if (sortAdapter.getData().size() <= 0) {
+            return;
+        }
+        for (MovieSort.SortData data : sortAdapter.getData()) {
+            if (data.id.equals("my0")) {
+                if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && absXml != null && absXml.videoList != null && absXml.videoList.size() > 0) {
+                    fragments.add(UserFragment.newInstance(absXml.videoList));
                 } else {
-                    fragments.add(GridFragment.newInstance(data));
+                    fragments.add(UserFragment.newInstance(null));
+                }
+            } else {
+                fragments.add(GridFragment.newInstance(data));
+            }
+        }
+        int myIndex = findMyTabIndex();
+        currentSelected = myIndex;
+        sortFocused = myIndex;
+        pageAdapter = new HomePageAdapter(getSupportFragmentManager(), fragments);
+        try {
+            Field field = ViewPager.class.getDeclaredField("mScroller");
+            field.setAccessible(true);
+            FixedSpeedScroller scroller = new FixedSpeedScroller(mContext, new AccelerateInterpolator());
+            field.set(mViewPager, scroller);
+            scroller.setmDuration(300);
+        } catch (Exception e) {
+        }
+        mViewPager.setPageTransformer(true, new DefaultTransformer());
+        mViewPager.setAdapter(pageAdapter);
+        mViewPager.setCurrentItem(myIndex, false);
+        mGridView.post(() -> {
+            mGridView.setSelection(myIndex);
+            changeTop(myIndex != 0);
+            BaseLazyFragment current = fragments.get(myIndex);
+            current.setUserVisibleHint(true);
+        });
+    }
+
+    private int findMyTabIndex() {
+        List<MovieSort.SortData> tabs = sortAdapter.getData();
+        for (int i = 0; i < tabs.size(); i++) {
+            if ("my0".equals(tabs.get(i).id)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private void clearHomeFragments() {
+        List<Fragment> existing = getSupportFragmentManager().getFragments();
+        if (existing != null) {
+            for (Fragment fragment : existing) {
+                if (fragment instanceof BaseLazyFragment) {
+                    getSupportFragmentManager().beginTransaction().remove(fragment).commitNowAllowingStateLoss();
                 }
             }
-            pageAdapter = new HomePageAdapter(getSupportFragmentManager(), fragments);
-            try {
-                Field field = ViewPager.class.getDeclaredField("mScroller");
-                field.setAccessible(true);
-                FixedSpeedScroller scroller = new FixedSpeedScroller(mContext, new AccelerateInterpolator());
-                field.set(mViewPager, scroller);
-                scroller.setmDuration(300);
-            } catch (Exception e) {
-            }
-            mViewPager.setPageTransformer(true, new DefaultTransformer());
-            mViewPager.setAdapter(pageAdapter);
-            mViewPager.setCurrentItem(currentSelected, false);
         }
+        fragments.clear();
     }
 
     @Override

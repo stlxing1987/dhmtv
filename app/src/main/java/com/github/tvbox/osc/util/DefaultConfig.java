@@ -49,8 +49,11 @@ public class DefaultConfig {
                 }
             }
         }
-        if (withMy)
-            data.add(0, new MovieSort.SortData("my0", "我的"));
+        if (withMy) {
+            MovieSort.SortData my = new MovieSort.SortData("my0", "我的");
+            my.sort = Integer.MIN_VALUE;
+            data.add(my);
+        }
         Collections.sort(data);
         return data;
     }
