@@ -81,13 +81,21 @@ public class PlayerHelper {
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        IJKCode codec = ApiConfig.get().getIJKCodec(ijkCode);
+        playerType = resolvePlayType(playerType);
+        IJKCode codec = null;
+        if (playerType == 1) {
+            codec = ApiConfig.get().getIJKCodec(ijkCode);
+            if (codec == null) {
+                playerType = 2;
+            }
+        }
         PlayerFactory playerFactory;
         if (playerType == 1) {
+            final IJKCode ijkCodecObj = codec;
             playerFactory = new PlayerFactory<IjkMediaPlayer>() {
                 @Override
                 public IjkMediaPlayer createPlayer(Context context) {
-                    return new IjkMediaPlayer(context, codec);
+                    return new IjkMediaPlayer(context, ijkCodecObj);
                 }
             };
             try {

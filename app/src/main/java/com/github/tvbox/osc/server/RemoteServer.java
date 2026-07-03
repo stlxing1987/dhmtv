@@ -107,6 +107,13 @@ public class RemoteServer extends NanoHTTPD {
                     Map<String, String> params = session.getParms();
                     if (params.containsKey("do")) {
                         Object[] rs = ApiConfig.get().proxyLocal(params);
+                        if (rs == null || rs.length < 3) {
+                            String doParam = params.get("do");
+                            return NanoHTTPD.newFixedLengthResponse(
+                                    NanoHTTPD.Response.Status.INTERNAL_ERROR,
+                                    NanoHTTPD.MIME_PLAINTEXT,
+                                    "proxy unavailable: unsupported do=" + doParam);
+                        }
                         try {
                             int code = (int) rs[0];
                             String mime = (String) rs[1];

@@ -12,7 +12,11 @@ import com.github.tvbox.osc.server.ControlManager;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,11 +38,22 @@ public class DefaultConfig {
             if (!categories.isEmpty()) {
                 for (String cate : categories) {
                     for (MovieSort.SortData sortData : list) {
-                        if (sortData.name.equals(cate)) {
+                        if (sortData.name.equals(cate)
+                                || sortData.name.contains(cate)
+                                || cate.contains(sortData.name)) {
                             if (sortData.filters == null)
                                 sortData.filters = new ArrayList<>();
-                            data.add(sortData);
+                            if (!data.contains(sortData)) {
+                                data.add(sortData);
+                            }
                         }
+                    }
+                }
+                if (data.isEmpty()) {
+                    for (MovieSort.SortData sortData : list) {
+                        if (sortData.filters == null)
+                            sortData.filters = new ArrayList<>();
+                        data.add(sortData);
                     }
                 }
             } else {
@@ -318,8 +333,257 @@ public class DefaultConfig {
     }
 
     public static String checkReplaceProxy(String urlOri) {
-        if (urlOri.startsWith("proxy://"))
-            return urlOri.replace("proxy://", ControlManager.get().getAddress(true) + "proxy?");
-        return urlOri;
+        if (TextUtils.isEmpty(urlOri) || !urlOri.startsWith("proxy://")) {
+            return urlOri;
+        }
+        ControlManager.get().startServer();
+        String address = ControlManager.get().getAddress(true);
+        if (TextUtils.isEmpty(address)) {
+            return urlOri;
+        }
+        return urlOri.replace("proxy://", address + "proxy?");
+    }
+
+    public static void normalizeSpiderPlayResult(JSONObject result) throws org.json.JSONException {
+        if (result == null) {
+            return;
+        }
+        if (TextUtils.isEmpty(result.optString("url", ""))) {
+            String playUrl = result.optString("playUrl", "");
+            if (!TextUtils.isEmpty(playUrl)) {
+                result.put("url", playUrl);
+            }
+        }
+        Object urlObj = result.opt("url");
+        if (urlObj instanceof JSONObject) {
+            JSONObject urlJson = (JSONObject) urlObj;
+            String nested = urlJson.optString("url", urlJson.optString("src", ""));
+            if (!TextUtils.isEmpty(nested)) {
+                result.put("url", nested);
+            }
+        }
+        if (!TextUtils.isEmpty(result.optString("url", ""))) {
+            return;
+        }
+        String[] urlKeys = {"mediaUrl", "videoUrl", "link", "src"};
+        for (String key : urlKeys) {
+            String value = result.optString(key, "");
+            if (!TextUtils.isEmpty(value)) {
+                result.put("url", value);
+                return;
+            }
+        }
+        String[] nestedKeys = {"data", "play", "result"};
+        for (String nestedKey : nestedKeys) {
+            JSONObject nested = result.optJSONObject(nestedKey);
+            if (nested == null) {
+                continue;
+            }
+            mergePlayField(result, nested, "url");
+            mergePlayField(result, nested, "playUrl");
+            mergePlayField(result, nested, "parse");
+            mergePlayField(result, nested, "jx");
+            mergePlayField(result, nested, "flag");
+            mergePlayField(result, nested, "header");
+            if (!TextUtils.isEmpty(result.optString("url", ""))) {
+                return;
+            }
+        }
+    }
+
+    private static void mergePlayField(JSONObject target, JSONObject source, String key) throws org.json.JSONException {
+        if (target.has(key) || !source.has(key)) {
+            return;
+        }
+        target.put(key, source.get(key));
+    }
+
+    public static boolean isPlayParseEnabled(JSONObject info) {
+        if (info == null) {
+            return true;
+        }
+        if (!info.has("parse")) {
+            String url = info.optString("url", "");
+            if (isVideoFormat(url) || url.startsWith("proxy://") || url.startsWith("http")) {
+                return false;
+            }
+            return true;
+        }
+        Object value = info.opt("parse");
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() != 0;
+        }
+        String text = String.valueOf(value);
+        return "1".equals(text) || "true".equalsIgnoreCase(text);
+    }
+
+    public static boolean isPlayJxEnabled(JSONObject info) {
+        if (info == null || !info.has("jx")) {
+            return false;
+        }
+        Object value = info.opt("jx");
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() != 0;
+        }
+        String text = String.valueOf(value);
+        return "1".equals(text) || "true".equalsIgnoreCase(text);
+    }
+
+    public static HashMap<String, String> parsePlayHeaders(JSONObject info) {
+        if (info == null || !info.has("header")) {
+            return null;
+        }
+        HashMap<String, String> headers = null;
+        try {
+            JSONObject hds = info.optJSONObject("header");
+            if (hds == null) {
+                String raw = info.optString("header", "");
+                if (!TextUtils.isEmpty(raw)) {
+                    hds = new JSONObject(raw);
+                }
+            }
+            if (hds != null) {
+                Iterator<String> keys = hds.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    if (headers == null) {
+                        headers = new HashMap<>();
+                    }
+                    headers.put(key, hds.optString(key, ""));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return headers;
+    }
+
+    /** 弹幕等非关键服务失败时不应阻断视频播放 */
+    public static boolean isNonFatalPlayMessage(String msg) {
+        if (TextUtils.isEmpty(msg)) {
+            return false;
+        }
+        String lower = msg.toLowerCase();
+        return msg.contains("弹幕") || lower.contains("danmu") || lower.contains("danmaku");
+    }
+
+    public static boolean hasPlayableUrlInJson(String json) {
+        if (TextUtils.isEmpty(json)) {
+            return false;
+        }
+        String trimmed = json.trim();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+            return trimmed.startsWith("http") || trimmed.startsWith("proxy://")
+                    || isVideoFormat(trimmed);
+        }
+        try {
+            if (trimmed.startsWith("[")) {
+                org.json.JSONArray arr = new org.json.JSONArray(trimmed);
+                for (int i = 0; i < arr.length(); i++) {
+                    if (hasPlayableUrlInJson(arr.getJSONObject(i).toString())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            JSONObject obj = new JSONObject(trimmed);
+            normalizeSpiderPlayResult(obj);
+            return !TextUtils.isEmpty(obj.optString("url", ""));
+        } catch (Throwable ignored) {
+            return !TextUtils.isEmpty(extractPlayUrlFromJson(trimmed));
+        }
+    }
+
+    public static String extractPlayUrlFromJson(String json) {
+        if (TextUtils.isEmpty(json)) {
+            return "";
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(proxy://[^\"'\\s\\\\]+|https?://[^\"'\\s\\\\]+)")
+                .matcher(json);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "";
+    }
+
+    public static JSONObject buildPlayResultFromExtractedUrl(String rawUrl, String playFlag, String progressKey)
+            throws org.json.JSONException {
+        String mediaUrl = extractPlayUrlFromJson(rawUrl);
+        if (TextUtils.isEmpty(mediaUrl)) {
+            return null;
+        }
+        return buildPlayResultFromRawUrl(mediaUrl, playFlag, progressKey);
+    }
+
+    public static JSONObject buildDirectPlayResult(String episodeUrl, String playFlag, String progressKey)
+            throws org.json.JSONException {
+        JSONObject result = new JSONObject();
+        String mediaUrl = checkReplaceProxy(episodeUrl);
+        result.put("url", mediaUrl);
+        result.put("key", episodeUrl);
+        result.put("proKey", progressKey);
+        result.put("parse", 0);
+        result.put("flag", playFlag);
+        return result;
+    }
+
+    public static JSONObject buildParsePlayResult(String episodeUrl, String playFlag, String progressKey)
+            throws org.json.JSONException {
+        JSONObject result = new JSONObject();
+        String mediaUrl = checkReplaceProxy(episodeUrl);
+        result.put("url", mediaUrl);
+        result.put("key", episodeUrl);
+        result.put("proKey", progressKey);
+        result.put("parse", 1);
+        result.put("playUrl", "");
+        result.put("flag", playFlag);
+        return result;
+    }
+
+    public static JSONObject buildPlayResultFromRawUrl(String rawUrl, String playFlag, String progressKey)
+            throws org.json.JSONException {
+        String mediaUrl = checkReplaceProxy(rawUrl.trim());
+        if (isVideoFormat(mediaUrl) || mediaUrl.startsWith("proxy://")) {
+            return buildDirectPlayResult(mediaUrl, playFlag, progressKey);
+        }
+        if (mediaUrl.startsWith("http")) {
+            return buildParsePlayResult(mediaUrl, playFlag, progressKey);
+        }
+        return null;
+    }
+
+    public static boolean isDriveAuthMessage(String msg) {
+        if (TextUtils.isEmpty(msg)) {
+            return false;
+        }
+        String text = msg.toLowerCase();
+        return msg.contains("扫码") || msg.contains("登录") || msg.contains("授权")
+                || msg.contains("网盘") || text.contains("token") || text.contains("cookie")
+                || msg.contains("QrCode") || msg.contains("二维码");
+    }
+
+    public static boolean isDriveAuthUrl(String url) {
+        if (TextUtils.isEmpty(url)) {
+            return false;
+        }
+        String lower = url.toLowerCase();
+        if (!lower.contains("/proxy") && !lower.contains("proxy?")) {
+            return false;
+        }
+        return lower.contains("qrcode") || lower.contains("login") || lower.contains("oauth")
+                || lower.contains("type=ali") || lower.contains("type=quark") || lower.contains("type=uc")
+                || lower.contains("type=115") || lower.contains("type=thunder")
+                || lower.contains("do=ali") || lower.contains("do=quark") || lower.contains("do=pan");
+    }
+
+    public static String buildDriveAuthUrl(String driveType) {
+        ControlManager.get().startServer();
+        return DriveAuthHelper.buildProxyWebUrl(driveType, null);
     }
 }

@@ -57,6 +57,18 @@
             android:textSize="@dimen/mobile_text_lg" />
 
         <TextView
+            android:id="@+id/itemCheckUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="@dimen/mobile_space_md"
+            android:background="@drawable/shape_mobile_search"
+            android:gravity="center_vertical"
+            android:paddingLeft="@dimen/mobile_space_lg"
+            android:text="检查更新"
+            android:textColor="@color/color_FFFFFF"
+            android:textSize="@dimen/mobile_text_lg" />
+
+        <TextView
             android:id="@+id/tvUiModeValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

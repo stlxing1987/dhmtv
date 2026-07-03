@@ -6,6 +6,7 @@ import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.base.BaseActivity;
 import com.github.tvbox.osc.base.BaseLazyFragment;
 import com.github.tvbox.osc.ui.activity.SettingActivity;
+import com.github.tvbox.osc.util.AppUpdateHelper;
 import com.github.tvbox.osc.util.ConfigDialogHelper;
 import com.github.tvbox.osc.util.DeviceHelper;
 import com.github.tvbox.osc.util.HawkConfig;
@@ -31,6 +32,8 @@ public class MobileMineFragment extends BaseLazyFragment {
         findViewById(R.id.itemLine).setOnClickListener(v ->
                 ConfigDialogHelper.showLineSwitchDialog((BaseActivity) mActivity, null));
         findViewById(R.id.itemUiMode).setOnClickListener(v -> cycleUiMode());
+        findViewById(R.id.itemCheckUpdate).setOnClickListener(v ->
+                AppUpdateHelper.check((BaseActivity) mActivity, true));
     }
 
     @Override

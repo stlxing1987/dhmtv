@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">大花喵</string>
+    <!-- 热更新：填 update.json 地址（不是 apk 直链），留空则仅在设置里手动填写 -->
+    <string name="app_update_url" translatable="false">http://cdwjct.hezongyy.com:152/soft/tt/appupdate/update.json</string>
 </resources>

@@ -84,7 +84,7 @@ public class ConfigDialogHelper {
                     if (callback != null) {
                         callback.onLineChanged();
                     }
-                    reloadConfig(activity, true);
+                    reloadConfig(activity, false);
                 }
             }
 

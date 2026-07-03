@@ -43,4 +43,14 @@ public class HawkConfig {
     public static final String HOME_GRID_COLS = "home_grid_cols";
     public static final String UI_MODE = "ui_mode";
     public static final String DEVICE_AUTO_DETECTED = "device_auto_detected";
+    /** 远程 update.json 地址，留空则读 strings.xml 的 app_update_url */
+    public static final String APP_UPDATE_URL = "app_update_url";
+    /** 用户点「稍后」时忽略的版本号 */
+    public static final String APP_UPDATE_IGNORE_CODE = "app_update_ignore_code";
+    /** 启动时是否自动检查 App 更新 */
+    public static final String APP_UPDATE_CHECK_ON_START = "app_update_check_on_start";
+    /** 搜索历史 */
+    public static final String SEARCH_HISTORY = "search_history";
+    /** 已触发安装、待新版本启动后清理 APK 缓存 */
+    public static final String APP_UPDATE_PENDING_CODE = "app_update_pending_code";
 }

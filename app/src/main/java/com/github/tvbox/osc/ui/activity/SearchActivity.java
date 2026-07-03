@@ -13,6 +13,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.tvbox.osc.R;
@@ -23,16 +24,18 @@ import com.github.tvbox.osc.bean.Movie;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.event.ServerEvent;
-import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.ui.adapter.PinyinAdapter;
 import com.github.tvbox.osc.ui.adapter.SearchAdapter;
+import com.github.tvbox.osc.ui.adapter.SearchHotAdapter;
+import com.github.tvbox.osc.ui.adapter.SearchSourceFilterAdapter;
 import com.github.tvbox.osc.ui.dialog.RemoteDialog;
-import com.github.tvbox.osc.ui.tv.QRCodeGen;
 import com.github.tvbox.osc.ui.tv.widget.SearchKeyboard;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.MobileUiHelper;
 import com.github.tvbox.osc.util.PinyinSearchHelper;
+import com.github.tvbox.osc.util.SearchHistoryHelper;
+import com.github.tvbox.osc.util.SearchHotHelper;
 import com.github.tvbox.osc.util.SearchSuggestHelper;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.google.gson.JsonArray;
@@ -53,8 +56,10 @@ import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -66,22 +71,51 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @description:
  */
 public class SearchActivity extends BaseActivity {
+    private static final int MODE_BROWSE = 0;
+    private static final int MODE_RESULT = 1;
+
     private LinearLayout llLayout;
+    private LinearLayout llHistoryPanel;
+    private LinearLayout llSourcePanel;
+    private LinearLayout llCenterPanel;
+    private LinearLayout llHotPanel;
+    private LinearLayout llResultPanel;
     private TvRecyclerView mGridView;
     private TvRecyclerView mGridViewWord;
+    private TvRecyclerView mGridViewHistory;
+    private TvRecyclerView mGridViewHot;
+    private TvRecyclerView mGridViewSource;
+    private TextView tvSearchCount;
+    private TextView tvClearHistory;
+
     SourceViewModel sourceViewModel;
     private EditText etSearch;
     private TextView tvSearch;
     private TextView tvClear;
-    private SearchKeyboard keyboard;
+    private TextView tvRemote;
+    private TextView tvDelete;
     private TextView tvAddress;
     private ImageView ivQRCode;
+    private SearchKeyboard keyboard;
+
     private SearchAdapter searchAdapter;
     private PinyinAdapter wordAdapter;
+    private PinyinAdapter historyAdapter;
+    private SearchHotAdapter hotAdapter;
+    private SearchSourceFilterAdapter sourceFilterAdapter;
+
     private String searchTitle = "";
     private final ArrayList<String> searchCorpus = new ArrayList<>();
     private List<String> searchKeywords = new ArrayList<>();
+    private List<SearchHotHelper.Section> hotSections = new ArrayList<>();
+    private final List<Movie.Video> allSearchResults = new ArrayList<>();
+    private String selectedSourceKey = null;
+    private int displayMode = MODE_BROWSE;
     private boolean mobileUi;
+
+    private List<Runnable> pauseRunnable = null;
+    private ExecutorService searchExecutorService = null;
+    private AtomicInteger allRunCount = new AtomicInteger(0);
 
     @Override
     protected int getLayoutResID() {
@@ -96,12 +130,14 @@ public class SearchActivity extends BaseActivity {
         initData();
     }
 
-    private List<Runnable> pauseRunnable = null;
-
     @Override
     protected void onResume() {
         super.onResume();
-        if (pauseRunnable != null && pauseRunnable.size() > 0) {
+        if (!mobileUi && displayMode == MODE_RESULT && !allSearchResults.isEmpty()) {
+            showResultMode();
+            filterAndDisplayResults();
+        }
+        if (pauseRunnable != null && !pauseRunnable.isEmpty()) {
             searchExecutorService = Executors.newFixedThreadPool(getSearchThreadCount());
             allRunCount.set(pauseRunnable.size());
             for (Runnable runnable : pauseRunnable) {
@@ -114,45 +150,14 @@ public class SearchActivity extends BaseActivity {
 
     private void initView() {
         EventBus.getDefault().register(this);
-        llLayout = findViewById(R.id.llLayout);
         etSearch = findViewById(R.id.etSearch);
         tvSearch = findViewById(R.id.tvSearch);
         tvClear = findViewById(R.id.tvClear);
-        tvAddress = findViewById(R.id.tvAddress);
-        ivQRCode = findViewById(R.id.ivQRCode);
         mGridView = findViewById(R.id.mGridView);
         keyboard = findViewById(R.id.keyBoardRoot);
-        mGridViewWord = findViewById(R.id.mGridViewWord);
-        mGridViewWord.setHasFixedSize(true);
-        if (mobileUi) {
-            mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
-            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, MobileUiHelper.getHomeGridColumns(this)));
-            View btnBack = findViewById(R.id.btnBack);
-            if (btnBack != null) {
-                btnBack.setOnClickListener(v -> finish());
-            }
-            etSearch.setOnEditorActionListener((v, actionId, event) -> {
-                if (actionId == EditorInfo.IME_ACTION_SEARCH
-                        || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
-                    triggerSearch();
-                    return true;
-                }
-                return false;
-            });
-        } else {
-            mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
-            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 3));
-        }
-        wordAdapter = new PinyinAdapter();
-        mGridViewWord.setAdapter(wordAdapter);
-        wordAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                search(wordAdapter.getItem(position));
-            }
-        });
-        mGridView.setHasFixedSize(true);
+
         searchAdapter = new SearchAdapter();
+        mGridView.setHasFixedSize(true);
         mGridView.setAdapter(searchAdapter);
         searchAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
@@ -160,14 +165,7 @@ public class SearchActivity extends BaseActivity {
                 FastClickCheckUtil.check(view);
                 Movie.Video video = searchAdapter.getData().get(position);
                 if (video != null) {
-                    try {
-                        if (searchExecutorService != null) {
-                            pauseRunnable = searchExecutorService.shutdownNow();
-                            searchExecutorService = null;
-                        }
-                    } catch (Throwable th) {
-                        th.printStackTrace();
-                    }
+                    stopSearchExecutor();
                     Bundle bundle = new Bundle();
                     bundle.putString("id", video.id);
                     bundle.putString("sourceKey", video.sourceKey);
@@ -175,6 +173,7 @@ public class SearchActivity extends BaseActivity {
                 }
             }
         });
+
         tvSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -187,36 +186,178 @@ public class SearchActivity extends BaseActivity {
             public void onClick(View v) {
                 FastClickCheckUtil.check(v);
                 etSearch.setText("");
-            }
-        });
-        if (keyboard != null && keyboard.getVisibility() == View.VISIBLE) {
-            keyboard.setOnSearchKeyListener(new SearchKeyboard.OnSearchKeyListener() {
-            @Override
-            public void onSearchKey(int pos, String key) {
-                if (pos > 1) {
-                    String text = etSearch.getText().toString().trim();
-                    text += key;
-                    etSearch.setText(text);
-                    if (text.length() > 0) {
-                        loadRec(text);
-                    }
-                } else if (pos == 1) {
-                    String text = etSearch.getText().toString().trim();
-                    if (text.length() > 0) {
-                        text = text.substring(0, text.length() - 1);
-                        etSearch.setText(text);
-                    }
-                    if (text.length() > 0) {
-                        loadRec(text);
-                    }
-                } else if (pos == 0) {
-                    RemoteDialog remoteDialog = new RemoteDialog(mContext);
-                    remoteDialog.show();
+                if (!mobileUi) {
+                    showDefaultHot();
                 }
             }
+        });
+
+        if (mobileUi) {
+            initMobileView();
+        } else {
+            initTvView();
+        }
+    }
+
+    private void initMobileView() {
+        llLayout = findViewById(R.id.llLayout);
+        tvAddress = findViewById(R.id.tvAddress);
+        ivQRCode = findViewById(R.id.ivQRCode);
+        mGridViewWord = findViewById(R.id.mGridViewWord);
+        mGridViewWord.setHasFixedSize(true);
+        mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
+        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, MobileUiHelper.getHomeGridColumns(this)));
+
+        wordAdapter = new PinyinAdapter();
+        mGridViewWord.setAdapter(wordAdapter);
+        wordAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
+                search(wordAdapter.getItem(position));
+            }
+        });
+
+        View btnBack = findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
+        etSearch.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH
+                    || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+                triggerSearch();
+                return true;
+            }
+            return false;
+        });
+
+        if (keyboard != null && keyboard.getVisibility() == View.VISIBLE) {
+            keyboard.setOnSearchKeyListener(new SearchKeyboard.OnSearchKeyListener() {
+                @Override
+                public void onSearchKey(int pos, String key) {
+                    handleLegacyKeyboardInput(pos, key);
+                }
             });
         }
+
         setLoadSir(llLayout);
+    }
+
+    private void initTvView() {
+        llHistoryPanel = findViewById(R.id.llHistoryPanel);
+        llSourcePanel = findViewById(R.id.llSourcePanel);
+        llCenterPanel = findViewById(R.id.llCenterPanel);
+        llHotPanel = findViewById(R.id.llHotPanel);
+        llResultPanel = findViewById(R.id.llResultPanel);
+        tvRemote = findViewById(R.id.tvRemote);
+        tvDelete = findViewById(R.id.tvDelete);
+        tvSearchCount = findViewById(R.id.tvSearchCount);
+        tvClearHistory = findViewById(R.id.tvClearHistory);
+        keyboard.setLettersOnly(true);
+
+        mGridViewHistory = findViewById(R.id.mGridViewHistory);
+        mGridViewHistory.setHasFixedSize(true);
+        mGridViewHistory.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
+        historyAdapter = new PinyinAdapter();
+        historyAdapter.setNewData(SearchHistoryHelper.getHistory());
+        mGridViewHistory.setAdapter(historyAdapter);
+        historyAdapter.setOnItemClickListener((adapter, view, position) -> {
+            String word = historyAdapter.getItem(position);
+            etSearch.setText(word);
+            search(word);
+        });
+
+        mGridViewHot = findViewById(R.id.mGridViewHot);
+        mGridViewHot.setHasFixedSize(true);
+        hotAdapter = new SearchHotAdapter();
+        V7GridLayoutManager hotLayoutManager = new V7GridLayoutManager(this.mContext, 4);
+        hotLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+            @Override
+            public int getSpanSize(int position) {
+                return hotAdapter.getItemViewType(position) == SearchHotAdapter.TYPE_HEADER ? 4 : 1;
+            }
+        });
+        mGridViewHot.setLayoutManager(hotLayoutManager);
+        mGridViewHot.setAdapter(hotAdapter);
+        hotAdapter.setOnItemClickListener((adapter, view, position) -> {
+            SearchHotAdapter.HotItem item = hotAdapter.getItem(position);
+            if (item != null && item.getItemType() == SearchHotAdapter.TYPE_WORD) {
+                etSearch.setText(item.text);
+                search(item.text);
+            }
+        });
+
+        mGridViewSource = findViewById(R.id.mGridViewSource);
+        mGridViewSource.setHasFixedSize(true);
+        mGridViewSource.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
+        sourceFilterAdapter = new SearchSourceFilterAdapter();
+        mGridViewSource.setAdapter(sourceFilterAdapter);
+        sourceFilterAdapter.setOnItemClickListener((adapter, view, position) -> {
+            SearchSourceFilterAdapter.FilterItem item = sourceFilterAdapter.getItem(position);
+            if (item == null) {
+                return;
+            }
+            sourceFilterAdapter.setSelectedPosition(position);
+            selectedSourceKey = item.sourceKey;
+            filterAndDisplayResults();
+        });
+
+        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 5));
+
+        tvRemote.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            new RemoteDialog(mContext).show();
+        });
+        tvDelete.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            String text = etSearch.getText().toString().trim();
+            if (!text.isEmpty()) {
+                etSearch.setText(text.substring(0, text.length() - 1));
+            }
+            if (etSearch.getText().length() > 0) {
+                loadRec(etSearch.getText().toString().trim());
+            } else {
+                showDefaultHot();
+            }
+        });
+        tvClearHistory.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            SearchHistoryHelper.clear();
+            historyAdapter.setNewData(new ArrayList<>());
+        });
+
+        keyboard.setOnSearchKeyListener((pos, key) -> {
+            String text = etSearch.getText().toString().trim();
+            text += key;
+            etSearch.setText(text);
+            if (text.length() > 0) {
+                loadRec(text);
+            }
+        });
+
+        setLoadSir(llResultPanel);
+        showBrowseMode();
+    }
+
+    private void handleLegacyKeyboardInput(int pos, String key) {
+        if (pos > 1) {
+            String text = etSearch.getText().toString().trim();
+            text += key;
+            etSearch.setText(text);
+            if (text.length() > 0) {
+                loadRec(text);
+            }
+        } else if (pos == 1) {
+            String text = etSearch.getText().toString().trim();
+            if (text.length() > 0) {
+                text = text.substring(0, text.length() - 1);
+                etSearch.setText(text);
+            }
+            if (text.length() > 0) {
+                loadRec(text);
+            }
+        } else if (pos == 0) {
+            new RemoteDialog(mContext).show();
+        }
     }
 
     private void triggerSearch() {
@@ -232,13 +373,50 @@ public class SearchActivity extends BaseActivity {
         sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
     }
 
+    private void showBrowseMode() {
+        displayMode = MODE_BROWSE;
+        llHistoryPanel.setVisibility(View.VISIBLE);
+        llSourcePanel.setVisibility(View.GONE);
+        llCenterPanel.setVisibility(View.VISIBLE);
+        llHotPanel.setVisibility(View.VISIBLE);
+        llResultPanel.setVisibility(View.GONE);
+        refreshHistory();
+    }
+
+    private void showResultMode() {
+        displayMode = MODE_RESULT;
+        llHistoryPanel.setVisibility(View.GONE);
+        llSourcePanel.setVisibility(View.VISIBLE);
+        llCenterPanel.setVisibility(View.GONE);
+        llHotPanel.setVisibility(View.GONE);
+        llResultPanel.setVisibility(View.VISIBLE);
+        mGridView.setVisibility(View.VISIBLE);
+    }
+
+    private void refreshHistory() {
+        if (historyAdapter != null) {
+            historyAdapter.setNewData(SearchHistoryHelper.getHistory());
+        }
+    }
+
     /**
      * 拼音联想：本地简拼匹配 + 腾讯接口补充
      */
     private void loadRec(String key) {
         if (TextUtils.isEmpty(key)) {
+            if (!mobileUi) {
+                showDefaultHot();
+            }
             return;
         }
+        if (mobileUi) {
+            loadRecMobile(key);
+        } else {
+            loadRecTv(key);
+        }
+    }
+
+    private void loadRecMobile(String key) {
         if (PinyinSearchHelper.isLatinInput(key)) {
             List<String> local = PinyinSearchHelper.matchLatin(key, searchCorpus);
             if (!local.isEmpty()) {
@@ -262,17 +440,95 @@ public class SearchActivity extends BaseActivity {
 
             @Override
             public void onError() {
-                fallbackLocalRec(key);
+                fallbackLocalRecMobile(key);
             }
         });
     }
 
-    private void fallbackLocalRec(String key) {
+    private void loadRecTv(String key) {
+        showSuggestions(buildSuggestions(key));
+        SearchSuggestHelper.fetch(key, new SearchSuggestHelper.Callback() {
+            @Override
+            public void onResult(List<String> titles) {
+                LinkedHashSet<String> merged = new LinkedHashSet<>(buildSuggestions(key));
+                merged.addAll(titles);
+                ArrayList<String> list = new ArrayList<>(merged);
+                addToCorpus(list);
+                showSuggestions(list);
+            }
+
+            @Override
+            public void onError() {
+                showSuggestions(buildSuggestions(key));
+            }
+        });
+    }
+
+    private List<String> buildSuggestions(String key) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+        if (PinyinSearchHelper.isLatinInput(key)) {
+            merged.addAll(PinyinSearchHelper.matchLatin(key, searchCorpus));
+        } else {
+            merged.addAll(PinyinSearchHelper.matchText(key, searchCorpus));
+        }
+        merged.addAll(filterHotWords(key));
+        return new ArrayList<>(merged);
+    }
+
+    private List<String> filterHotWords(String key) {
+        LinkedHashSet<String> matched = new LinkedHashSet<>();
+        if (hotSections == null) {
+            return new ArrayList<>();
+        }
+        for (SearchHotHelper.Section section : hotSections) {
+            if (section.words == null) {
+                continue;
+            }
+            for (String word : section.words) {
+                if (TextUtils.isEmpty(word)) {
+                    continue;
+                }
+                String core = PinyinSearchHelper.extractCoreTitle(word);
+                if (PinyinSearchHelper.isLatinInput(key)) {
+                    String jp = PinyinSearchHelper.toJianpin(core);
+                    String upper = key.trim().toUpperCase();
+                    if (jp.startsWith(upper) || PinyinSearchHelper.jianpinSubsequence(jp, upper)) {
+                        matched.add(core);
+                    }
+                } else if (core.contains(key)) {
+                    matched.add(core);
+                }
+            }
+        }
+        return new ArrayList<>(matched);
+    }
+
+    private void fallbackLocalRecMobile(String key) {
         if (PinyinSearchHelper.isLatinInput(key)) {
             List<String> local = PinyinSearchHelper.matchLatin(key, searchCorpus);
             if (!local.isEmpty()) {
                 wordAdapter.setNewData(local);
             }
+        }
+    }
+
+    private void showSuggestions(List<String> words) {
+        if (displayMode == MODE_RESULT || hotAdapter == null) {
+            return;
+        }
+        List<SearchHotAdapter.HotItem> items = new ArrayList<>();
+        for (String word : words) {
+            items.add(new SearchHotAdapter.HotItem(SearchHotAdapter.TYPE_WORD, word));
+        }
+        hotAdapter.setNewData(items);
+    }
+
+    private void showDefaultHot() {
+        if (displayMode == MODE_RESULT || hotAdapter == null) {
+            return;
+        }
+        if (hotSections != null && !hotSections.isEmpty()) {
+            hotAdapter.setSections(hotSections);
         }
     }
 
@@ -289,8 +545,11 @@ public class SearchActivity extends BaseActivity {
 
     private void initData() {
         if (!mobileUi) {
-            refreshQRCode();
+            loadHotSections();
+        } else {
+            loadMobileHotWords();
         }
+
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("title")) {
             String title = intent.getStringExtra("title");
@@ -300,7 +559,9 @@ public class SearchActivity extends BaseActivity {
             showLoading();
             search(title);
         }
-        // 加载热词
+    }
+
+    private void loadMobileHotWords() {
         ArrayList<String> fallbackHots = new ArrayList<>();
         fallbackHots.add("完美世界");
         fallbackHots.add("镖人");
@@ -317,10 +578,13 @@ public class SearchActivity extends BaseActivity {
                     public void onSuccess(Response<String> response) {
                         try {
                             ArrayList<String> hots = new ArrayList<>();
-                            JsonArray itemList = JsonParser.parseString(response.body()).getAsJsonObject().get("data").getAsJsonObject().get("itemList").getAsJsonArray();
+                            JsonArray itemList = JsonParser.parseString(response.body())
+                                    .getAsJsonObject().get("data").getAsJsonObject()
+                                    .get("itemList").getAsJsonArray();
                             for (JsonElement ele : itemList) {
                                 JsonObject obj = (JsonObject) ele;
-                                hots.add(obj.get("title").getAsString().trim().replaceAll("<|>|《|》|-", "").split(" ")[0]);
+                                hots.add(obj.get("title").getAsString().trim()
+                                        .replaceAll("<|>|《|》|-", "").split(" ")[0]);
                             }
                             addToCorpus(hots);
                             wordAdapter.setNewData(hots);
@@ -336,10 +600,31 @@ public class SearchActivity extends BaseActivity {
                 });
     }
 
-    private void refreshQRCode() {
-        String address = ControlManager.get().getAddress(false);
-        tvAddress.setText(String.format("远程搜索使用手机/电脑扫描下面二维码或者直接浏览器访问地址\n%s", address));
-        ivQRCode.setImageBitmap(QRCodeGen.generateBitmap(address, 300, 300));
+    private void loadHotSections() {
+        ArrayList<String> fallback = new ArrayList<>();
+        fallback.add("完美世界");
+        fallback.add("镖人");
+        fallback.add("爱情有烟火");
+        fallback.add("庆余年");
+        fallback.add("斗罗大陆");
+        addToCorpus(fallback);
+        showSuggestions(fallback);
+        SearchHotHelper.fetchSections(sections -> runOnUiThread(() -> {
+            hotSections = sections;
+            addHotWordsToCorpus(sections);
+            if (displayMode == MODE_BROWSE && TextUtils.isEmpty(etSearch.getText().toString().trim())) {
+                showDefaultHot();
+            }
+        }));
+    }
+
+    private void addHotWordsToCorpus(List<SearchHotHelper.Section> sections) {
+        if (sections == null) {
+            return;
+        }
+        for (SearchHotHelper.Section section : sections) {
+            addToCorpus(section.words);
+        }
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -365,9 +650,20 @@ public class SearchActivity extends BaseActivity {
     private void search(String title) {
         cancel();
         showLoading();
+        SearchHistoryHelper.add(title);
         this.searchTitle = title;
-        mGridView.setVisibility(View.INVISIBLE);
-        searchAdapter.setNewData(new ArrayList<>());
+
+        if (mobileUi) {
+            mGridView.setVisibility(View.INVISIBLE);
+            searchAdapter.setNewData(new ArrayList<>());
+        } else {
+            showResultMode();
+            refreshHistory();
+            allSearchResults.clear();
+            selectedSourceKey = null;
+            searchAdapter.setNewData(new ArrayList<>());
+            updateSourceFilterList();
+        }
 
         if (PinyinSearchHelper.isLatinInput(title)) {
             List<String> keywords = PinyinSearchHelper.resolveSearchKeywords(title, searchCorpus);
@@ -389,7 +685,9 @@ public class SearchActivity extends BaseActivity {
             @Override
             public void onResult(List<String> titles) {
                 addToCorpus(titles);
-                wordAdapter.setNewData(titles);
+                if (mobileUi && wordAdapter != null) {
+                    wordAdapter.setNewData(titles);
+                }
                 searchKeywords = titles;
                 searchResult();
             }
@@ -411,37 +709,26 @@ public class SearchActivity extends BaseActivity {
         showEmpty();
         Toast.makeText(mContext, mobileUi
                 ? "未识别简拼「" + latin + "」，请从上方选择片名"
-                : "未识别简拼「" + latin + "」，请从左侧选择片名", Toast.LENGTH_LONG).show();
+                : "未识别简拼「" + latin + "」，请从热门或历史中选择片名", Toast.LENGTH_LONG).show();
     }
 
-    private ExecutorService searchExecutorService = null;
-    private AtomicInteger allRunCount = new AtomicInteger(0);
-
     private void searchResult() {
-        try {
-            if (searchExecutorService != null) {
-                searchExecutorService.shutdownNow();
-                searchExecutorService = null;
-            }
-        } catch (Throwable th) {
-            th.printStackTrace();
-        } finally {
+        stopSearchExecutor();
+        allRunCount.set(0);
+        if (mobileUi) {
             searchAdapter.setNewData(new ArrayList<>());
-            allRunCount.set(0);
         }
         searchExecutorService = Executors.newFixedThreadPool(getSearchThreadCount());
-        List<SourceBean> searchRequestList = new ArrayList<>();
-        searchRequestList.addAll(ApiConfig.get().getSourceBeanList());
+        List<SourceBean> searchRequestList = new ArrayList<>(ApiConfig.get().getSourceBeanList());
         SourceBean home = ApiConfig.get().getHomeSourceBean();
         searchRequestList.remove(home);
         searchRequestList.add(0, home);
 
         ArrayList<String> siteKey = new ArrayList<>();
         for (SourceBean bean : searchRequestList) {
-            if (!bean.isSearchable()) {
-                continue;
+            if (bean.isSearchable()) {
+                siteKey.add(bean.getKey());
             }
-            siteKey.add(bean.getKey());
         }
         if (searchKeywords == null || searchKeywords.isEmpty()) {
             searchKeywords = new ArrayList<>();
@@ -466,7 +753,16 @@ public class SearchActivity extends BaseActivity {
     }
 
     private void searchData(AbsXml absXml) {
-        if (absXml != null && absXml.movie != null && absXml.movie.videoList != null && absXml.movie.videoList.size() > 0) {
+        if (mobileUi) {
+            searchDataMobile(absXml);
+        } else {
+            searchDataTv(absXml);
+        }
+    }
+
+    private void searchDataMobile(AbsXml absXml) {
+        if (absXml != null && absXml.movie != null && absXml.movie.videoList != null
+                && absXml.movie.videoList.size() > 0) {
             List<Movie.Video> data = new ArrayList<>();
             Set<String> exists = new HashSet<>();
             for (Movie.Video old : searchAdapter.getData()) {
@@ -496,12 +792,93 @@ public class SearchActivity extends BaseActivity {
             if (searchAdapter.getData().size() <= 0) {
                 showEmpty();
                 if (searchTitle != null && PinyinSearchHelper.isLatinInput(searchTitle)) {
-                    Toast.makeText(mContext, mobileUi
-                            ? "简拼「" + searchTitle + "」未搜到结果，可尝试上方推荐片名"
-                            : "简拼「" + searchTitle + "」未搜到结果，可尝试左侧推荐片名", Toast.LENGTH_LONG).show();
+                    Toast.makeText(mContext, "简拼「" + searchTitle + "」未搜到结果，可尝试上方推荐片名",
+                            Toast.LENGTH_LONG).show();
                 }
             }
-            cancel();
+            stopSearchExecutor();
+        }
+    }
+
+    private void searchDataTv(AbsXml absXml) {
+        if (absXml != null && absXml.movie != null && absXml.movie.videoList != null
+                && !absXml.movie.videoList.isEmpty()) {
+            Set<String> exists = new HashSet<>();
+            for (Movie.Video old : allSearchResults) {
+                exists.add(old.sourceKey + "|" + old.id + "|" + old.name);
+            }
+            for (Movie.Video video : absXml.movie.videoList) {
+                if (video != null && video.name != null && !video.name.isEmpty()
+                        && video.id != null && !video.id.isEmpty()) {
+                    String dedupeKey = video.sourceKey + "|" + video.id + "|" + video.name;
+                    if (!exists.contains(dedupeKey)) {
+                        exists.add(dedupeKey);
+                        allSearchResults.add(video);
+                    }
+                }
+            }
+            showSuccess();
+            updateSourceFilterList();
+            filterAndDisplayResults();
+        }
+
+        int count = allRunCount.decrementAndGet();
+        if (count <= 0) {
+            if (allSearchResults.isEmpty()) {
+                showEmpty();
+                if (searchTitle != null && PinyinSearchHelper.isLatinInput(searchTitle)) {
+                    Toast.makeText(mContext, "简拼「" + searchTitle + "」未搜到结果", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                showSuccess();
+            }
+            stopSearchExecutor();
+        }
+    }
+
+    private void updateSourceFilterList() {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Movie.Video video : allSearchResults) {
+            counts.put(video.sourceKey, counts.getOrDefault(video.sourceKey, 0) + 1);
+        }
+        List<SearchSourceFilterAdapter.FilterItem> items = new ArrayList<>();
+        items.add(new SearchSourceFilterAdapter.FilterItem(null, "全部显示", allSearchResults.size()));
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            SourceBean source = ApiConfig.get().getSource(entry.getKey());
+            String name = source != null ? source.getName() : entry.getKey();
+            items.add(new SearchSourceFilterAdapter.FilterItem(entry.getKey(), name, entry.getValue()));
+        }
+        sourceFilterAdapter.setNewData(items);
+        sourceFilterAdapter.setSelectedPosition(0);
+        selectedSourceKey = null;
+        updateSearchCount(allSearchResults.size(), allSearchResults.size());
+    }
+
+    private void filterAndDisplayResults() {
+        List<Movie.Video> filtered = new ArrayList<>();
+        for (Movie.Video video : allSearchResults) {
+            if (selectedSourceKey == null || selectedSourceKey.equals(video.sourceKey)) {
+                filtered.add(video);
+            }
+        }
+        searchAdapter.setNewData(filtered);
+        updateSearchCount(filtered.size(), allSearchResults.size());
+    }
+
+    private void updateSearchCount(int shown, int total) {
+        if (tvSearchCount != null) {
+            tvSearchCount.setText("搜索(" + shown + "/" + total + ")");
+        }
+    }
+
+    private void stopSearchExecutor() {
+        try {
+            if (searchExecutorService != null) {
+                pauseRunnable = searchExecutorService.shutdownNow();
+                searchExecutorService = null;
+            }
+        } catch (Throwable th) {
+            th.printStackTrace();
         }
     }
 
@@ -516,17 +893,31 @@ public class SearchActivity extends BaseActivity {
     }
 
     @Override
+    public void onBackPressed() {
+        if (!mobileUi && displayMode == MODE_RESULT) {
+            showBrowseMode();
+            showSuccess();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (!mobileUi && event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getKeyCode() == KeyEvent.KEYCODE_BACK
+                && displayMode == MODE_RESULT) {
+            onBackPressed();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         cancel();
-        try {
-            if (searchExecutorService != null) {
-                searchExecutorService.shutdownNow();
-                searchExecutorService = null;
-            }
-        } catch (Throwable th) {
-            th.printStackTrace();
-        }
+        stopSearchExecutor();
         EventBus.getDefault().unregister(this);
     }
 }

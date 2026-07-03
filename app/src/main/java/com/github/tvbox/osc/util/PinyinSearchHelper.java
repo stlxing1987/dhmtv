@@ -131,6 +131,41 @@ public class PinyinSearchHelper {
         return Collections.emptyList();
     }
 
+    public static boolean jianpinSubsequence(String jianpin, String upper) {
+        if (TextUtils.isEmpty(jianpin) || TextUtils.isEmpty(upper)) {
+            return false;
+        }
+        int j = 0;
+        for (int i = 0; i < upper.length() && j < jianpin.length(); i++) {
+            if (jianpin.charAt(j) == upper.charAt(i)) {
+                j++;
+            }
+        }
+        return j == jianpin.length();
+    }
+
+    public static List<String> matchText(String text, List<String> corpus) {
+        if (TextUtils.isEmpty(text)) {
+            return Collections.emptyList();
+        }
+        LinkedHashSet<String> matched = new LinkedHashSet<>();
+        List<String> all = new ArrayList<>();
+        Collections.addAll(all, BUILTIN_TITLES);
+        if (corpus != null) {
+            for (String item : corpus) {
+                if (!TextUtils.isEmpty(item) && !all.contains(item)) {
+                    all.add(item);
+                }
+            }
+        }
+        for (String title : all) {
+            if (!TextUtils.isEmpty(title) && title.contains(text)) {
+                matched.add(title);
+            }
+        }
+        return new ArrayList<>(matched);
+    }
+
     /** 从联想词/带集数标题中提取核心片名，如「吞噬星空229」→「吞噬星空」 */
     public static String extractCoreTitle(String title) {
         if (TextUtils.isEmpty(title)) {

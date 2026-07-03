@@ -1,0 +1,7 @@
+{
+  "versionCode": 2,
+  "versionName": "1.0.1",
+  "apkUrl": "https://your-domain.com/dhmtv/app-release.apk",
+  "forceUpdate": false,
+  "changelog": "1. 修复手机版界面\n2. 新增在线更新"
+}

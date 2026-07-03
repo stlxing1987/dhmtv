@@ -53,12 +53,12 @@ public class JarLoader {
                         }
                         break;
                     }
-                    Thread.sleep(200);
+                    Thread.sleep(50);
                 } catch (Throwable th) {
                     th.printStackTrace();
                 }
                 count++;
-            } while (count < 5);
+            } while (count < 3);
         } catch (Throwable th) {
             th.printStackTrace();
         }

@@ -20,6 +20,7 @@ import com.github.tvbox.osc.ui.fragment.MobileHistoryCollectFragment;
 import com.github.tvbox.osc.ui.fragment.MobileHomeFragment;
 import com.github.tvbox.osc.ui.fragment.MobileMineFragment;
 import com.github.tvbox.osc.util.AppManager;
+import com.github.tvbox.osc.util.AppUpdateHelper;
 import com.github.tvbox.osc.util.SettingUiHelper;
 import com.github.tvbox.osc.util.UiModeSwitcher;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
@@ -120,6 +121,7 @@ public class MobileHomeActivity extends BaseActivity {
         if (fragment instanceof MobileHomeFragment) {
             ((MobileHomeFragment) fragment).reloadContent();
         }
+        AppUpdateHelper.checkOnStartup(this);
     }
 
     private void switchNav(int index) {

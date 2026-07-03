@@ -569,8 +569,14 @@ public class ApiConfig {
         String md5 = urls.length > 1 ? urls[1].trim() : "";
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp.jar");
 
-        if (!md5.isEmpty() || useCache) {
-            if (cache.exists() && (useCache || MD5.getFileMd5(cache).equalsIgnoreCase(md5))) {
+        if (cache.exists()) {
+            boolean canUseCache;
+            if (!md5.isEmpty()) {
+                canUseCache = MD5.getFileMd5(cache).equalsIgnoreCase(md5);
+            } else {
+                canUseCache = useCache;
+            }
+            if (canUseCache) {
                 if (jarLoader.load(cache.getAbsolutePath())) {
                     callback.success();
                 } else {
@@ -631,7 +637,14 @@ public class ApiConfig {
         mDefaultParse = null;
         vipParseFlags = new ArrayList<>();
         // spider
-        spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
+        String newSpider = DefaultConfig.safeJsonString(infoJson, "spider", "");
+        if (!TextUtils.isEmpty(spider) && !TextUtils.equals(spider, newSpider)) {
+            File jarCache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp.jar");
+            if (jarCache.exists()) {
+                jarCache.delete();
+            }
+        }
+        spider = newSpider;
         // 远端站点源
         SourceBean firstSite = null;
         JsonArray sitesArray = safeJsonArray(infoJson, "sites");
@@ -639,38 +652,42 @@ public class ApiConfig {
             throw new IllegalStateException("配置中无可用站点");
         }
         for (JsonElement opt : sitesArray) {
-            JsonObject obj = (JsonObject) opt;
-            SourceBean sb = new SourceBean();
-            String siteKey = obj.get("key").getAsString().trim();
-            sb.setKey(siteKey);
-            sb.setName(obj.get("name").getAsString().trim());
-            String api = DefaultConfig.normalizeCmsApi(obj.get("api").getAsString().trim());
-            sb.setType(DefaultConfig.resolveSourceType(obj.get("type").getAsInt(), api));
-            sb.setApi(api);
-            sb.setSearchable(DefaultConfig.safeJsonInt(obj, "searchable", 1));
-            sb.setQuickSearch(DefaultConfig.safeJsonInt(obj, "quickSearch", 1));
-            sb.setFilterable(DefaultConfig.safeJsonInt(obj, "filterable", 1));
-            sb.setPlayerUrl(DefaultConfig.safeJsonString(obj, "playUrl", ""));
-            sb.setExt(DefaultConfig.safeJsonExt(obj, "ext", ""));
-            sb.setCategories(DefaultConfig.safeJsonStringList(obj, "categories"));
-            if (firstSite == null)
-                firstSite = sb;
-            sourceBeanList.put(siteKey, sb);
+            try {
+                JsonObject obj = (JsonObject) opt;
+                SourceBean sb = new SourceBean();
+                String siteKey = DefaultConfig.safeJsonString(obj, "key", "");
+                if (siteKey.isEmpty()) {
+                    continue;
+                }
+                sb.setKey(siteKey);
+                sb.setName(DefaultConfig.safeJsonString(obj, "name", siteKey));
+                String api = DefaultConfig.normalizeCmsApi(DefaultConfig.safeJsonString(obj, "api", ""));
+                if (api.isEmpty()) {
+                    continue;
+                }
+                sb.setType(DefaultConfig.resolveSourceType(DefaultConfig.safeJsonInt(obj, "type", 3), api));
+                sb.setApi(api);
+                sb.setSearchable(DefaultConfig.safeJsonInt(obj, "searchable", 1));
+                sb.setQuickSearch(DefaultConfig.safeJsonInt(obj, "quickSearch", 1));
+                sb.setFilterable(DefaultConfig.safeJsonInt(obj, "filterable", 1));
+                sb.setPlayerUrl(DefaultConfig.safeJsonString(obj, "playUrl", ""));
+                sb.setExt(DefaultConfig.safeJsonExt(obj, "ext", ""));
+                sb.setCategories(DefaultConfig.safeJsonStringList(obj, "categories"));
+                if (firstSite == null) {
+                    firstSite = sb;
+                }
+                sourceBeanList.put(siteKey, sb);
+            } catch (Throwable ignored) {
+            }
+        }
+        if (sourceBeanList.isEmpty()) {
+            throw new IllegalStateException("配置中无可用站点");
         }
         if (sourceBeanList != null && sourceBeanList.size() > 0) {
             String home = Hawk.get(HawkConfig.HOME_API, "");
             SourceBean sh = getSource(home);
             if (sh == null) {
-                SourceBean defaultHome = firstSite;
-                if (defaultHome != null && defaultHome.getType() == 3) {
-                    for (SourceBean sb : sourceBeanList.values()) {
-                        if (sb.getType() == 1 || sb.getType() == 0) {
-                            defaultHome = sb;
-                            break;
-                        }
-                    }
-                }
-                setSourceBean(defaultHome);
+                setSourceBean(firstSite);
             } else {
                 setSourceBean(sh);
             }
@@ -803,6 +820,13 @@ public class ApiConfig {
         }
         if (!foundOldSelect && ijkCodes.size() > 0) {
             ijkCodes.get(0).selected(true);
+        }
+        if (ijkCodes.isEmpty()) {
+            IJKCode codec = new IJKCode();
+            codec.setName("软解码");
+            codec.setOption(new LinkedHashMap<>());
+            codec.selected(true);
+            ijkCodes.add(codec);
         }
     }
 
@@ -1201,9 +1225,15 @@ public class ApiConfig {
     }
 
     public IJKCode getIJKCodec(String name) {
-        for (IJKCode code : ijkCodes) {
-            if (code.getName().equals(name))
-                return code;
+        if (ijkCodes == null || ijkCodes.isEmpty()) {
+            return null;
+        }
+        if (!TextUtils.isEmpty(name)) {
+            for (IJKCode code : ijkCodes) {
+                if (code.getName().equals(name)) {
+                    return code;
+                }
+            }
         }
         return ijkCodes.get(0);
     }

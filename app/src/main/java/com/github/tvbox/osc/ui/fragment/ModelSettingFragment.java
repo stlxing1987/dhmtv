@@ -22,8 +22,11 @@ import com.github.tvbox.osc.ui.activity.SettingActivity;
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter;
 import com.github.tvbox.osc.ui.dialog.AboutDialog;
 import com.github.tvbox.osc.ui.dialog.BackupDialog;
+import com.github.tvbox.osc.ui.dialog.DriveAuthDialog;
 import com.github.tvbox.osc.ui.dialog.SelectDialog;
 import com.github.tvbox.osc.ui.dialog.XWalkInitDialog;
+import com.github.tvbox.osc.util.AppUpdateChecker;
+import com.github.tvbox.osc.util.AppUpdateHelper;
 import com.github.tvbox.osc.util.ConfigDialogHelper;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
@@ -117,16 +120,20 @@ public class ModelSettingFragment extends BaseLazyFragment {
         setCellLabel(R.id.llExoCache, "EXO缓存");
         setCellLabel(R.id.llResetApp, "重置App");
         setCellLabel(R.id.llParseWebVew, "嗅探Web");
+        setCellLabel(R.id.llDriveAuth, "网盘授权");
         setCellLabel(R.id.llHomeApi, "首页源");
         setCellLabel(R.id.llHomeGridCols, "首页列数");
         setCellLabel(R.id.llAbout, "关于");
         setCellLabel(R.id.llUiMode, "操作偏好");
+        setCellLabel(R.id.llCheckUpdate, "检查更新");
+        setCellLabel(R.id.llUpdateUrl, "更新地址");
         if (!MobileUiHelper.useMobileUi(mContext)) {
             setWideCell(R.id.llApi);
             setWideCell(R.id.llLineSwitch);
             setWideCell(R.id.llLiveApi);
             setWideCell(R.id.llHomePref);
             setWideCell(R.id.llUiMode);
+            setWideCell(R.id.llUpdateUrl);
         }
         hideCellValue(R.id.llChangeWallpaper);
         hideCellValue(R.id.llResetWallpaper);
@@ -134,6 +141,8 @@ public class ModelSettingFragment extends BaseLazyFragment {
         hideCellValue(R.id.llClearCache);
         hideCellValue(R.id.llThunderCache);
         hideCellValue(R.id.llResetApp);
+        hideCellValue(R.id.llCheckUpdate);
+        hideCellValue(R.id.llDriveAuth);
     }
 
     private void refreshValues() {
@@ -162,6 +171,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         setCellValue(R.id.llHomeGridCols, SettingUiHelper.getHomeGridColsName(Hawk.get(HawkConfig.HOME_GRID_COLS, 5)));
         setCellValue(R.id.llAbout, "V" + getAppVersionName());
         setCellValue(R.id.llUiMode, SettingUiHelper.getUiModeName(Hawk.get(HawkConfig.UI_MODE, 0)));
+        setCellValue(R.id.llUpdateUrl, getUpdateUrlDisplay());
     }
 
     private String getStoreDisplayName() {
@@ -396,6 +406,13 @@ public class ModelSettingFragment extends BaseLazyFragment {
                 dialog.show();
             }
         });
+        View llDriveAuth = findViewById(R.id.llDriveAuth);
+        if (llDriveAuth != null) {
+            llDriveAuth.setOnClickListener(v -> {
+                FastClickCheckUtil.check(v);
+                DriveAuthDialog.showPicker(mActivity);
+            });
+        }
         findViewById(R.id.llHomeApi).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
             List<SourceBean> sites = ApiConfig.get().getSourceBeanList();
@@ -440,6 +457,14 @@ public class ModelSettingFragment extends BaseLazyFragment {
         findViewById(R.id.llAbout).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
             new AboutDialog(mActivity).show();
+        });
+        findViewById(R.id.llCheckUpdate).setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            AppUpdateHelper.check((BaseActivity) mActivity, true);
+        });
+        findViewById(R.id.llUpdateUrl).setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            showUpdateUrlDialog();
         });
         findViewById(R.id.llUiMode).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
@@ -652,6 +677,33 @@ public class ModelSettingFragment extends BaseLazyFragment {
         } else {
             return "缩略图";
         }
+    }
+
+    private String getUpdateUrlDisplay() {
+        String url = AppUpdateChecker.getUpdateUrl(mContext);
+        if (TextUtils.isEmpty(url)) {
+            return "未设置";
+        }
+        return url.length() > 28 ? url.substring(0, 28) + "…" : url;
+    }
+
+    private void showUpdateUrlDialog() {
+        android.widget.EditText input = new android.widget.EditText(mActivity);
+        input.setSingleLine(true);
+        input.setText(Hawk.get(HawkConfig.APP_UPDATE_URL, ""));
+        input.setHint(mContext.getString(R.string.app_update_url));
+        new AlertDialog.Builder(mActivity)
+                .setTitle("App 更新地址")
+                .setMessage("填写 update.json 的完整 URL")
+                .setView(input)
+                .setPositiveButton("保存", (d, w) -> {
+                    String url = input.getText().toString().trim();
+                    Hawk.put(HawkConfig.APP_UPDATE_URL, url);
+                    refreshValues();
+                    Toast.makeText(mContext, "已保存", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private String getAppVersionName() {

@@ -49,12 +49,21 @@ public class SelectDialog<T> extends BaseDialog {
         adapter.setData(data, select);
         TvRecyclerView tvRecyclerView = ((TvRecyclerView) findViewById(R.id.list));
         tvRecyclerView.setAdapter(adapter);
-        tvRecyclerView.setSelectedPosition(select);
-        tvRecyclerView.post(new Runnable() {
-            @Override
-            public void run() {
-                tvRecyclerView.scrollToPosition(select);
-            }
-        });
+        int safeSelect = select;
+        if (safeSelect < 0 || safeSelect >= data.size()) {
+            safeSelect = data.isEmpty() ? 0 : 0;
+        }
+        if (!data.isEmpty()) {
+            tvRecyclerView.setSelectedPosition(safeSelect);
+            final int scrollTarget = safeSelect;
+            tvRecyclerView.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (scrollTarget >= 0 && scrollTarget < adapter.getItemCount()) {
+                        tvRecyclerView.scrollToPosition(scrollTarget);
+                    }
+                }
+            });
+        }
     }
 }

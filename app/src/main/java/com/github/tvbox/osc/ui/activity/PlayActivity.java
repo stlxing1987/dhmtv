@@ -44,15 +44,18 @@ import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.bean.VodInfo;
 import com.github.tvbox.osc.cache.CacheManager;
 import com.github.tvbox.osc.event.RefreshEvent;
+import com.github.tvbox.osc.ui.dialog.DriveAuthDialog;
 import com.github.tvbox.osc.player.controller.VodController;
 import com.github.tvbox.osc.player.thirdparty.MXPlayer;
 import com.github.tvbox.osc.player.thirdparty.ReexPlayer;
+import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.util.AdBlocker;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.MD5;
 import com.github.tvbox.osc.util.PlayerHelper;
+import com.github.tvbox.osc.util.PlayLauncher;
 import com.github.tvbox.osc.util.XWalkUtils;
 import com.github.tvbox.osc.util.thunder.Thunder;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
@@ -77,6 +80,7 @@ import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -101,6 +105,7 @@ public class PlayActivity extends BaseActivity {
 
     @Override
     protected void init() {
+        ControlManager.get().startServer();
         initView();
         initViewModel();
         initData();
@@ -300,35 +305,51 @@ public class PlayActivity extends BaseActivity {
         sourceViewModel.playResult.observe(this, new Observer<JSONObject>() {
             @Override
             public void onChanged(JSONObject info) {
-                if (info != null) {
-                    try {
-                        progressKey = info.optString("proKey", null);
-                        boolean parse = info.optString("parse", "1").equals("1");
-                        boolean jx = info.optString("jx", "0").equals("1");
-                        playSubtitle = info.optString("subt", /*"https://dash.akamaized.net/akamai/test/caption_test/ElephantsDream/ElephantsDream_en.vtt"*/"");
-                        String playUrl = info.optString("playUrl", "");
-                        String flag = info.optString("flag");
-                        String url = info.optString("url", "");
-                        if (url.isEmpty()) {
-                            errorWithRetry("播放地址为空", true);
+                if (info == null) {
+                    return;
+                }
+                if (info.has("_playToken")
+                        && info.optLong("_playToken") != sourceViewModel.getActivePlayToken()) {
+                    return;
+                }
+                try {
+                    if (info.has("_playError")) {
+                        String errMsg = info.optString("_playError", "获取播放信息失败");
+                        if (TextUtils.isEmpty(errMsg)) {
+                            errMsg = "获取播放信息失败";
+                        }
+                        if (DefaultConfig.isNonFatalPlayMessage(errMsg)) {
                             return;
                         }
-                        HashMap<String, String> headers = null;
-                        if (info.has("header")) {
-                            try {
-                                JSONObject hds = new JSONObject(info.getString("header"));
-                                Iterator<String> keys = hds.keys();
-                                while (keys.hasNext()) {
-                                    String key = keys.next();
-                                    if (headers == null) {
-                                        headers = new HashMap<>();
-                                    }
-                                    headers.put(key, hds.getString(key));
-                                }
-                            } catch (Throwable th) {
-
-                            }
+                        if (DefaultConfig.isDriveAuthMessage(errMsg)) {
+                            setTip(errMsg + "，请扫码授权", false, false);
+                            DriveAuthDialog.showPicker(mContext);
+                            return;
                         }
+                        errorWithRetry(errMsg, false);
+                        return;
+                    }
+                        progressKey = info.optString("proKey", null);
+                        boolean parse = DefaultConfig.isPlayParseEnabled(info);
+                        boolean jx = DefaultConfig.isPlayJxEnabled(info);
+                        playSubtitle = info.optString("subt", /*"https://dash.akamaized.net/akamai/test/caption_test/ElephantsDream/ElephantsDream_en.vtt"*/"");
+                        String playUrl = DefaultConfig.checkReplaceProxy(info.optString("playUrl", ""));
+                        String flag = info.optString("flag");
+                        String url = DefaultConfig.checkReplaceProxy(info.optString("url", ""));
+                        if (url.isEmpty()) {
+                            errorWithRetry("播放地址为空", false);
+                            return;
+                        }
+                        if (DefaultConfig.isDriveAuthUrl(url)) {
+                            setTip("请使用手机网盘App扫码授权", true, false);
+                            DriveAuthDialog.showForUrl(mContext, url);
+                            return;
+                        }
+                        HashMap<String, String> headers = DefaultConfig.parsePlayHeaders(info);
+                        List<String> vipFlags = ApiConfig.get().getVipParseFlags();
+                        boolean userJxList = (playUrl.isEmpty()
+                                && vipFlags != null
+                                && vipFlags.contains(flag)) || jx;
                         if (parse || jx) {
                             if (DefaultConfig.isDyttShareUrl(url)) {
                                 doParseDyttShare(url);
@@ -341,18 +362,15 @@ public class PlayActivity extends BaseActivity {
                                     return;
                                 }
                             }
-                            boolean userJxList = (playUrl.isEmpty() && ApiConfig.get().getVipParseFlags().contains(flag)) || jx;
                             initParse(flag, userJxList, playUrl, url);
                         } else {
                             mController.showParse(false);
                             playUrl(playUrl + url, headers);
                         }
                     } catch (Throwable th) {
-                        errorWithRetry("获取播放信息错误", true);
+                        th.printStackTrace();
+                        errorWithRetry("获取播放信息错误", false);
                     }
-                } else {
-                    errorWithRetry("获取播放信息错误", true);
-                }
             }
         });
     }
@@ -361,7 +379,10 @@ public class PlayActivity extends BaseActivity {
         Intent intent = getIntent();
         if (intent != null && intent.getExtras() != null) {
             Bundle bundle = intent.getExtras();
-            mVodInfo = (VodInfo) bundle.getSerializable("VodInfo");
+            mVodInfo = PlayLauncher.take();
+            if (mVodInfo == null) {
+                mVodInfo = (VodInfo) bundle.getSerializable("VodInfo");
+            }
             sourceKey = bundle.getString("sourceKey");
             sourceBean = ApiConfig.get().getSource(sourceKey);
             initPlayerCfg();
@@ -503,14 +524,26 @@ public class PlayActivity extends BaseActivity {
     }
 
     public void play() {
-        VodInfo.VodSeries vs = mVodInfo.seriesMap.get(mVodInfo.playFlag).get(mVodInfo.playIndex);
+        if (mVodInfo == null || TextUtils.isEmpty(mVodInfo.playFlag) || mVodInfo.seriesMap == null) {
+            errorWithRetry("播放数据异常", false);
+            return;
+        }
+        List<VodInfo.VodSeries> seriesList = mVodInfo.seriesMap.get(mVodInfo.playFlag);
+        if (seriesList == null || seriesList.isEmpty()) {
+            errorWithRetry("当前线路无播放地址", false);
+            return;
+        }
+        if (mVodInfo.playIndex < 0 || mVodInfo.playIndex >= seriesList.size()) {
+            mVodInfo.playIndex = 0;
+        }
+        VodInfo.VodSeries vs = seriesList.get(mVodInfo.playIndex);
         EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_REFRESH, mVodInfo.playIndex));
         setTip("正在获取播放信息", true, false);
         String playTitleInfo = mVodInfo.name + " " + vs.name;
         mController.setTitle(playTitleInfo);
 
         if (TextUtils.isEmpty(vs.url)) {
-            errorWithRetry("播放地址为空", true);
+            errorWithRetry("播放地址为空", false);
             return;
         }
 
@@ -627,6 +660,11 @@ public class PlayActivity extends BaseActivity {
                     }
                 }
             }
+            if (parseBean == null) {
+                parseBean = new ParseBean();
+                parseBean.setType(0);
+                parseBean.setUrl("");
+            }
         } else {
             if (playUrl.startsWith("json:")) {
                 parseBean = new ParseBean();
@@ -704,6 +742,10 @@ public class PlayActivity extends BaseActivity {
     ExecutorService parseThreadPool;
 
     private void doParse(ParseBean pb) {
+        if (pb == null) {
+            errorWithRetry("无可用解析线路", false);
+            return;
+        }
         stopParse();
         if (pb.getType() == 0) {
             setTip("正在嗅探播放地址", true, false);

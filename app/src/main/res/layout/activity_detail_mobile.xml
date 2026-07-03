@@ -235,6 +235,19 @@
                     app:tv_selectedItemIsCentered="false" />
 
                 <com.owen.tvrecyclerview.widget.TvRecyclerView
+                    android:id="@+id/mGridViewGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginLeft="@dimen/mobile_space_lg"
+                    android:layout_marginTop="@dimen/mobile_space_xs"
+                    android:layout_marginRight="@dimen/mobile_space_lg"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:visibility="gone"
+                    app:tv_horizontalSpacingWithMargins="@dimen/mobile_space_sm"
+                    app:tv_selectedItemIsCentered="false" />
+
+                <com.owen.tvrecyclerview.widget.TvRecyclerView
                     android:id="@+id/mGridView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

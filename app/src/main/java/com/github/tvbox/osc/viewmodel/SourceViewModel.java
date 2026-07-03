@@ -19,6 +19,7 @@ import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
+import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.util.thunder.Thunder;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -34,10 +35,12 @@ import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 
 import org.greenrobot.eventbus.EventBus;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -59,6 +62,7 @@ public class SourceViewModel extends ViewModel {
     public MutableLiveData<AbsXml> quickSearchResult;
     public MutableLiveData<AbsXml> detailResult;
     public MutableLiveData<JSONObject> playResult;
+    private volatile long activePlayToken = 0;
 
     public SourceViewModel() {
         sortResult = new MutableLiveData<>();
@@ -87,12 +91,16 @@ public class SourceViewModel extends ViewModel {
                         @Override
                         public String call() throws Exception {
                             Spider sp = ApiConfig.get().getCSP(sourceBean);
+                            String fast = sp.homeContent(false);
+                            if (!TextUtils.isEmpty(fast)) {
+                                return fast;
+                            }
                             return sp.homeContent(true);
                         }
                     });
                     String sortJson = null;
                     try {
-                        sortJson = future.get(15, TimeUnit.SECONDS);
+                        sortJson = future.get(10, TimeUnit.SECONDS);
                     } catch (TimeoutException e) {
                         e.printStackTrace();
                         future.cancel(true);
@@ -492,10 +500,21 @@ public class SourceViewModel extends ViewModel {
         }
     }
 
+    public long getActivePlayToken() {
+        return activePlayToken;
+    }
+
+    private void stampPlayToken(JSONObject result) throws JSONException {
+        if (result != null) {
+            result.put("_playToken", activePlayToken);
+        }
+    }
+
     public void getPlay(String sourceKey, String playFlag, String progressKey, String url) {
+        activePlayToken++;
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
         if (sourceBean == null) {
-            playResult.postValue(null);
+            postPlayError("播放源不存在");
             return;
         }
         int type = sourceBean.getType();
@@ -503,18 +522,26 @@ public class SourceViewModel extends ViewModel {
             spThreadPool.execute(new Runnable() {
                 @Override
                 public void run() {
+                    ControlManager.get().startServer();
                     Spider sp = ApiConfig.get().getCSP(sourceBean);
-                    String json = sp.playerContent(playFlag, url, ApiConfig.get().getVipParseFlags());
+                    String json = invokePlayerContent(sp, playFlag, url, ApiConfig.get().getVipParseFlags());
                     try {
-                        JSONObject result = new JSONObject(json);
-                        result.put("key", url);
-                        result.put("proKey", progressKey);
-                        if (!result.has("flag"))
-                            result.put("flag", playFlag);
-                        playResult.postValue(result);
+                        JSONObject result = parseSpiderPlayResponse(json, playFlag, progressKey, url);
+                        if (result != null) {
+                            stampPlayToken(result);
+                            playResult.postValue(result);
+                            return;
+                        }
+                        if (postDirectPlayFallback(playFlag, progressKey, url)) {
+                            return;
+                        }
+                        postPlayError("获取播放信息失败");
                     } catch (Throwable th) {
                         th.printStackTrace();
-                        playResult.postValue(null);
+                        if (postDirectPlayFallback(playFlag, progressKey, url)) {
+                            return;
+                        }
+                        postPlayError("获取播放信息失败");
                     }
                 }
             });
@@ -522,7 +549,7 @@ public class SourceViewModel extends ViewModel {
             JSONObject result = new JSONObject();
             try {
                 if (TextUtils.isEmpty(url)) {
-                    playResult.postValue(null);
+                    postPlayError("播放地址为空");
                     return;
                 }
                 result.put("key", url);
@@ -549,13 +576,169 @@ public class SourceViewModel extends ViewModel {
                 }
                 result.put("playUrl", playUrl);
                 result.put("flag", playFlag);
+                stampPlayToken(result);
                 playResult.postValue(result);
             } catch (Throwable th) {
                 th.printStackTrace();
-                playResult.postValue(null);
+                postPlayError("获取播放信息失败");
             }
         } else {
-            playResult.postValue(null);
+            postPlayError("不支持的播放源类型");
+        }
+    }
+
+    private String invokePlayerContent(Spider sp, String playFlag, String url, List<String> vipFlags) {
+        String[] flags = buildPlayFlags(playFlag, url);
+        String[] ids = resolvePlayIds(url);
+        String fallback = "";
+        for (String flag : flags) {
+            for (String id : ids) {
+                try {
+                    String json = sp.playerContent(flag, id, vipFlags);
+                    if (TextUtils.isEmpty(json)) {
+                        continue;
+                    }
+                    json = json.trim();
+                    if (DefaultConfig.hasPlayableUrlInJson(json)) {
+                        return json;
+                    }
+                    if (fallback.isEmpty()) {
+                        fallback = json;
+                    }
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                }
+            }
+        }
+        return fallback;
+    }
+
+    private String[] buildPlayFlags(String playFlag, String url) {
+        LinkedHashSet<String> flags = new LinkedHashSet<>();
+        if (!TextUtils.isEmpty(playFlag)) {
+            flags.add(playFlag);
+        }
+        flags.add("");
+        if (url != null && url.contains("$")) {
+            String[] parts = url.split("\\$", 2);
+            if (parts.length > 1 && !TextUtils.isEmpty(parts[1])) {
+                flags.add(parts[1]);
+            }
+        }
+        if (!TextUtils.isEmpty(playFlag)) {
+            flags.add(playFlag);
+        }
+        return flags.toArray(new String[0]);
+    }
+
+    private String[] resolvePlayIds(String url) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        if (TextUtils.isEmpty(url)) {
+            ids.add("");
+            return ids.toArray(new String[0]);
+        }
+        ids.add(url);
+        if (url.contains("$")) {
+            String[] parts = url.split("\\$", 2);
+            if (parts.length > 1 && !TextUtils.isEmpty(parts[1])) {
+                ids.add(parts[1]);
+            }
+            if (!TextUtils.isEmpty(parts[0])) {
+                ids.add(parts[0]);
+            }
+        }
+        return ids.toArray(new String[0]);
+    }
+
+    private JSONObject parseSpiderPlayResponse(String json, String playFlag, String progressKey, String episodeUrl)
+            throws JSONException {
+        if (TextUtils.isEmpty(json)) {
+            return null;
+        }
+        json = json.trim();
+        if (!json.startsWith("{") && !json.startsWith("[")) {
+            return DefaultConfig.buildPlayResultFromRawUrl(json, playFlag, progressKey);
+        }
+        if (json.startsWith("[")) {
+            org.json.JSONArray arr = new org.json.JSONArray(json);
+            if (arr.length() == 0) {
+                return null;
+            }
+            json = arr.getJSONObject(0).toString();
+        }
+        JSONObject result = new JSONObject(json);
+        DefaultConfig.normalizeSpiderPlayResult(result);
+        String playMsg = result.optString("msg", "");
+        String playUrlValue = result.optString("url", "");
+        if (TextUtils.isEmpty(playUrlValue)) {
+            JSONObject extracted = DefaultConfig.buildPlayResultFromExtractedUrl(json, playFlag, progressKey);
+            if (extracted != null) {
+                if (!TextUtils.isEmpty(playMsg) && DefaultConfig.isNonFatalPlayMessage(playMsg)) {
+                    extracted.remove("msg");
+                }
+                extracted.put("key", episodeUrl);
+                extracted.put("proKey", progressKey);
+                if (!extracted.has("flag")) {
+                    extracted.put("flag", playFlag);
+                }
+                return extracted;
+            }
+            if (!TextUtils.isEmpty(playMsg) && !DefaultConfig.isNonFatalPlayMessage(playMsg)) {
+                JSONObject err = new JSONObject();
+                err.put("_playError", playMsg);
+                return err;
+            }
+            return null;
+        }
+        if (!TextUtils.isEmpty(playMsg) && DefaultConfig.isNonFatalPlayMessage(playMsg)) {
+            result.remove("msg");
+        }
+        result.put("key", episodeUrl);
+        result.put("proKey", progressKey);
+        if (!result.has("flag")) {
+            result.put("flag", playFlag);
+        }
+        return result;
+    }
+
+    private void postPlayError(String message) {
+        try {
+            JSONObject err = new JSONObject();
+            err.put("_playError", TextUtils.isEmpty(message) ? "获取播放信息失败" : message);
+            stampPlayToken(err);
+            playResult.postValue(err);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean postDirectPlayFallback(String playFlag, String progressKey, String episodeUrl) {
+        if (!DefaultConfig.isVideoFormat(episodeUrl)) {
+            return postParsePlayFallback(playFlag, progressKey, episodeUrl);
+        }
+        try {
+            JSONObject result = DefaultConfig.buildDirectPlayResult(episodeUrl, playFlag, progressKey);
+            stampPlayToken(result);
+            playResult.postValue(result);
+            return true;
+        } catch (Throwable th) {
+            th.printStackTrace();
+            return postParsePlayFallback(playFlag, progressKey, episodeUrl);
+        }
+    }
+
+    private boolean postParsePlayFallback(String playFlag, String progressKey, String episodeUrl) {
+        if (TextUtils.isEmpty(episodeUrl) || episodeUrl.startsWith("magnet:")) {
+            return false;
+        }
+        try {
+            JSONObject result = DefaultConfig.buildParsePlayResult(episodeUrl, playFlag, progressKey);
+            stampPlayToken(result);
+            playResult.postValue(result);
+            return true;
+        } catch (Throwable th) {
+            th.printStackTrace();
+            return false;
         }
     }
 

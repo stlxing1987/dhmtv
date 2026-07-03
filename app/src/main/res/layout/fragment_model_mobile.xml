@@ -232,6 +232,27 @@
                 android:layout_marginBottom="@dimen/mobile_space_sm" />
 
             <include
+                android:id="@+id/llCheckUpdate"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llUpdateUrl"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
+                android:id="@+id/llDriveAuth"
+                layout="@layout/item_setting_cell_mobile"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mobile_cell_height"
+                android:layout_marginBottom="@dimen/mobile_space_sm" />
+
+            <include
                 android:id="@+id/llAbout"
                 layout="@layout/item_setting_cell_mobile"
                 android:layout_width="match_parent"
