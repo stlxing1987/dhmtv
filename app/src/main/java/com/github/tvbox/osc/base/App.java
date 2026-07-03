@@ -2,6 +2,8 @@ package com.github.tvbox.osc.base;
 
 import androidx.multidex.MultiDexApplication;
 
+import com.github.catvod.Init;
+import com.github.catvod.Proxy;
 import com.github.tvbox.osc.callback.EmptyCallback;
 import com.github.tvbox.osc.callback.LoadingCallback;
 import com.github.tvbox.osc.data.AppDataManager;
@@ -30,6 +32,7 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        Init.set(this);
         initParams();
         DeviceHelper.initDeviceMode(this);
         // OKGo

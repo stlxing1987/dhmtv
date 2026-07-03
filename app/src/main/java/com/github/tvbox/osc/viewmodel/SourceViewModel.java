@@ -397,7 +397,7 @@ public class SourceViewModel extends ViewModel {
                 public void run() {
                     try {
                         Spider sp = ApiConfig.get().getCSP(sourceBean);
-                        json(searchResult, sp.searchContent(wd, false), sourceBean.getKey());
+                        json(searchResult, sp.searchContent(wd, false, "1"), sourceBean.getKey());
                     } catch (Throwable th) {
                         th.printStackTrace();
                         EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, null));
@@ -449,7 +449,7 @@ public class SourceViewModel extends ViewModel {
         if (type == 3) {
             try {
                 Spider sp = ApiConfig.get().getCSP(sourceBean);
-                json(quickSearchResult, sp.searchContent(wd, true), sourceBean.getKey());
+                json(quickSearchResult, sp.searchContent(wd, true, "1"), sourceBean.getKey());
             } catch (Throwable th) {
                 th.printStackTrace();
             }

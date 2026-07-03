@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 
+import com.github.catvod.Proxy;
 import com.github.tvbox.osc.bean.StoreBean;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.receiver.SearchReceiver;
@@ -94,6 +95,7 @@ public class ControlManager {
             });
             try {
                 mServer.start();
+                Proxy.set(RemoteServer.serverPort);
                 IjkMediaPlayer.setDotPort(Hawk.get(HawkConfig.DOH_URL, 0) > 0, RemoteServer.serverPort);
                 break;
             } catch (IOException ex) {
