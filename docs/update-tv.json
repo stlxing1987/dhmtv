@@ -3,5 +3,5 @@
   "versionName": "1.0.11",
   "apkUrl": "https://gh-proxy.com/https://github.com/stlxing1987/dhmtv/releases/download/v1.0.11-tv/app-tv.apk",
   "forceUpdate": false,
-  "changelog": "修复热更新安装失败：统一签名密钥，优化电视端安装兼容性"
+  "changelog": "docs: \u5b8c\u5584 README \u6253\u5305\u3001\u53d1\u5e03\u4e0e Releases \u6d41\u7a0b\u8bf4\u660e\n\n\u8865\u5145\u672c\u5730\u6784\u5efa\u3001GitHub Actions \u81ea\u52a8\u53d1\u7248\u3001\u70ed\u66f4\u65b0\u4e0e\u5e38\u89c1\u95ee\u9898\u3002\n\nCo-authored-by: Cursor <cursoragent@cursor.com>"
 }
