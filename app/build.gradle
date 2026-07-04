@@ -12,7 +12,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 10
-        versionName '1.0.10'
+        versionName '1.0.10'  // TV 专版发版
         multiDexEnabled true
         ndk {
             // TV 专版：仅保留 ARM 架构，减小包体积
