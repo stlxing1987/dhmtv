@@ -49,6 +49,13 @@ public class PlayerHelper {
         return ijkAvailable;
     }
 
+    public static String getIjkUnavailableTip() {
+        if (isX86Device()) {
+            return "当前为 x86 模拟器，不支持 IJK 播放器，请使用真机或切换 Exo";
+        }
+        return "IJK 播放器不可用，请尝试 Exo 或系统播放器";
+    }
+
     public static int resolvePlayType(int playType) {
         if (playType == 1 && !isIjkAvailable()) {
             return 2;

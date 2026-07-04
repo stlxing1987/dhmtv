@@ -24,6 +24,7 @@ import com.github.tvbox.osc.player.thirdparty.ReexPlayer;
 import com.github.tvbox.osc.ui.adapter.ParseAdapter;
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter;
 import com.github.tvbox.osc.ui.dialog.SelectDialog;
+import com.github.tvbox.osc.util.ExternalPlayerHelper;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.PlayerHelper;
 import com.orhanobut.hawk.Hawk;
@@ -384,14 +385,10 @@ public class VodController extends BaseController {
             return;
         }
         final ArrayList<PlayerOption> options = new ArrayList<>();
-        options.add(new PlayerOption(0, "系统"));
-        if (PlayerHelper.isIjkAvailable()) {
-            options.add(new PlayerOption(1, "IJK"));
-        }
-        options.add(new PlayerOption(2, "Exo"));
-        if (mxPlayerExist || reexPlayerExist) {
-            options.add(new PlayerOption(-1, "外部播放器"));
-        }
+        options.add(new PlayerOption(0, "系统", true));
+        options.add(new PlayerOption(1, "IJK", PlayerHelper.isIjkAvailable()));
+        options.add(new PlayerOption(2, "Exo", true));
+        options.add(new PlayerOption(-1, "外部播放器", mxPlayerExist || reexPlayerExist));
         int currentPl;
         try {
             currentPl = mPlayerConfig.getInt("pl");
@@ -437,6 +434,72 @@ public class VodController extends BaseController {
         dialog.show();
     }
 
+    private void showExternalPlayerInstallDialog() {
+        final ArrayList<Integer> options = new ArrayList<>();
+        if (!mxPlayerExist) {
+            options.add(ExternalPlayerHelper.TYPE_MX);
+        }
+        if (!reexPlayerExist) {
+            options.add(ExternalPlayerHelper.TYPE_REEX);
+        }
+        if (options.isEmpty()) {
+            Toast.makeText(getContext(), "外部播放器已安装", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        SelectDialog<Integer> dialog = new SelectDialog<>(getContext());
+        dialog.setTip("请选择要安装的外部播放器");
+        dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<Integer>() {
+            @Override
+            public void click(Integer value, int pos) {
+                startExternalPlayerDownload(value);
+            }
+
+            @Override
+            public String getDisplay(Integer val) {
+                return ExternalPlayerHelper.getDisplayName(val);
+            }
+        }, new DiffUtil.ItemCallback<Integer>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull Integer oldItem, @NonNull Integer newItem) {
+                return oldItem.intValue() == newItem.intValue();
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull Integer oldItem, @NonNull Integer newItem) {
+                return oldItem.intValue() == newItem.intValue();
+            }
+        }, options, 0);
+        dialog.show();
+    }
+
+    private void startExternalPlayerDownload(int playerType) {
+        Toast.makeText(getContext(), "开始下载 " + ExternalPlayerHelper.getDisplayName(playerType), Toast.LENGTH_SHORT).show();
+        ExternalPlayerHelper.downloadAndInstall(getContext(), playerType, new ExternalPlayerHelper.DownloadCallback() {
+            @Override
+            public void onProgress(int percent) {
+                if (percent > 0 && percent % 20 == 0) {
+                    mHandler.post(() -> Toast.makeText(getContext(),
+                            ExternalPlayerHelper.getDisplayName(playerType) + " 下载中 " + percent + "%",
+                            Toast.LENGTH_SHORT).show());
+                }
+            }
+
+            @Override
+            public void onSuccess() {
+                mHandler.post(() -> {
+                    mxPlayerExist = MXPlayer.getPackageInfo() != null;
+                    reexPlayerExist = ReexPlayer.getPackageInfo() != null;
+                    Toast.makeText(getContext(), "下载完成，请按提示完成安装", Toast.LENGTH_LONG).show();
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                mHandler.post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
     private void applyPlayerOption(PlayerOption option) {
         if (mPlayerConfig == null || option == null) {
             return;
@@ -445,15 +508,15 @@ public class VodController extends BaseController {
             int newType = option.playType;
             if (newType == -1) {
                 if (mxPlayerExist) {
-                    newType = 10;
+                    newType = ExternalPlayerHelper.TYPE_MX;
                 } else if (reexPlayerExist) {
-                    newType = 11;
+                    newType = ExternalPlayerHelper.TYPE_REEX;
                 } else {
-                    Toast.makeText(getContext(), "未安装外部播放器", Toast.LENGTH_SHORT).show();
+                    showExternalPlayerInstallDialog();
                     return;
                 }
             } else if (newType == 1 && !PlayerHelper.isIjkAvailable()) {
-                Toast.makeText(getContext(), "IJK播放器不可用", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), PlayerHelper.getIjkUnavailableTip(), Toast.LENGTH_LONG).show();
                 return;
             }
             int currentType = mPlayerConfig.getInt("pl");
@@ -472,10 +535,12 @@ public class VodController extends BaseController {
     private static class PlayerOption {
         final int playType;
         final String name;
+        final boolean available;
 
-        PlayerOption(int playType, String name) {
+        PlayerOption(int playType, String name, boolean available) {
             this.playType = playType;
             this.name = name;
+            this.available = available;
         }
     }
 
