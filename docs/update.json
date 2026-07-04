@@ -1,7 +1,7 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.2",
-  "apkUrl": "http://cdwjct.hezongyy.com:152/soft/tt/appupdate/release/update.apk",
+  "versionCode": 9,
+  "versionName": "1.0.9",
+  "apkUrl": "https://gh-proxy.com/https://github.com/stlxing1987/dhmtv/releases/download/v1.0.9/app-debug.apk",
   "forceUpdate": false,
-  "changelog": "1. 手机版界面优化\n2. 支持在线更新"
+  "changelog": "GitHub 自动发布，国内通过 gh-proxy 加速下载"
 }
