@@ -3,5 +3,5 @@
   "versionName": "1.0.10",
   "apkUrl": "https://gh-proxy.com/https://github.com/stlxing1987/dhmtv/releases/download/v1.0.10-tablet/app-tablet-debug.apk",
   "forceUpdate": false,
-  "changelog": "平板专版：横屏 TV 界面 + 平板设计尺寸，独立发布"
+  "changelog": "docs: \u6dfb\u52a0\u4e09\u5206\u652f\u7ed3\u6784\u8bf4\u660e README\n\n\u8bb0\u5f55 TV/\u624b\u673a/\u5e73\u677f\u5404\u5206\u652f\u7528\u9014\u3001\u5305\u540d\u4e0e\u6253\u5305\u65b9\u5f0f\uff0c\u4fbf\u4e8e\u540e\u7eed\u7ef4\u62a4\u3002\n\nCo-authored-by: Cursor <cursoragent@cursor.com>"
 }
