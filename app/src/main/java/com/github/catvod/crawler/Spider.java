@@ -8,12 +8,14 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import okhttp3.Dns;
 
 public abstract class Spider {
 
     public static JSONObject empty = new JSONObject();
+    public String siteKey;
 
     public void init(Context context) {
     }
@@ -73,6 +75,25 @@ public abstract class Spider {
      */
     public String searchContent(String key, boolean quick) {
         return "";
+    }
+
+    public String searchContent(String key, boolean quick, String pg) {
+        return searchContent(key, quick);
+    }
+
+    public String liveContent(String url) {
+        return "";
+    }
+
+    public Object[] proxy(Map<String, String> params) throws Exception {
+        return null;
+    }
+
+    public String action(String action) {
+        return "";
+    }
+
+    public void destroy() {
     }
 
     /**

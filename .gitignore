@@ -1,6 +1,7 @@
 # Built application files
 *.apk
 *.aar
+!app/libs/xwalk_shared_library-23.53.589.4.aar
 *.ap_
 *.aab
 

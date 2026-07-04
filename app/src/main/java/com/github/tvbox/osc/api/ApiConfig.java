@@ -9,6 +9,7 @@ import android.text.TextUtils;
 import android.util.Base64;
 
 import com.github.catvod.crawler.JarLoader;
+import com.github.catvod.crawler.PyLoader;
 import com.github.catvod.crawler.Spider;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.LiveChannelGroup;
@@ -76,6 +77,7 @@ public class ApiConfig {
     private SourceBean emptyHome = new SourceBean();
 
     private JarLoader jarLoader = new JarLoader();
+    private PyLoader pyLoader = new PyLoader();
     private int loadGeneration = 0;
     private boolean suppressUrlIndexDialog = false;
 
@@ -634,6 +636,7 @@ public class ApiConfig {
     private void parseJson(String apiUrl, JsonObject infoJson) {
         sourceBeanList.clear();
         parseBeanList.clear();
+        pyLoader.clear();
         mDefaultParse = null;
         vipParseFlags = new ArrayList<>();
         // spider
@@ -1143,10 +1146,18 @@ public class ApiConfig {
     }
 
     public Spider getCSP(SourceBean sourceBean) {
+        if (PyLoader.isPySource(sourceBean)) {
+            pyLoader.setRecent(sourceBean.getKey());
+            return pyLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt());
+        }
         return jarLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt());
     }
 
     public Object[] proxyLocal(Map param) {
+        if (param != null && "py".equals(param.get("do"))) {
+            Object[] rs = pyLoader.proxyInvoke(param);
+            if (rs != null) return rs;
+        }
         return jarLoader.proxyInvoke(param);
     }
 
