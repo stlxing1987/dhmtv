@@ -64,6 +64,9 @@ public class App extends MultiDexApplication {
         } else if (Hawk.get(HawkConfig.PLAY_TYPE, 0) == 1 && !PlayerHelper.isIjkAvailable()) {
             Hawk.put(HawkConfig.PLAY_TYPE, 2);
         }
+        if (!Hawk.contains(HawkConfig.IJK_CODEC) && PlayerHelper.isIjkAvailable()) {
+            Hawk.put(HawkConfig.IJK_CODEC, "硬解码");
+        }
         if (!Hawk.contains(HawkConfig.SEARCH_VIEW)) {
             Hawk.put(HawkConfig.SEARCH_VIEW, 1);
         }

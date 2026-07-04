@@ -9,8 +9,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.tvbox.osc.R;
@@ -20,6 +22,8 @@ import com.github.tvbox.osc.bean.ParseBean;
 import com.github.tvbox.osc.player.thirdparty.MXPlayer;
 import com.github.tvbox.osc.player.thirdparty.ReexPlayer;
 import com.github.tvbox.osc.ui.adapter.ParseAdapter;
+import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter;
+import com.github.tvbox.osc.ui.dialog.SelectDialog;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.PlayerHelper;
 import com.orhanobut.hawk.Hawk;
@@ -30,6 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import xyz.doikki.videoplayer.player.VideoView;
@@ -231,30 +236,7 @@ public class VodController extends BaseController {
         mPlayerBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                try {
-                    int playerType = mPlayerConfig.getInt("pl");
-                    boolean playerVail = false;
-                    do {
-                        playerType++;
-                        if (playerType <= 2) {
-                            playerVail = true;
-                        } else if (playerType == 10) {
-                            playerVail = mxPlayerExist;
-                        } else if (playerType == 11) {
-                            playerVail = reexPlayerExist;
-                        } else if (playerType > 11) {
-                            playerType = 0;
-                            playerVail = true;
-                        }
-                    } while (!playerVail);
-                    mPlayerConfig.put("pl", playerType);
-                    updatePlayerCfgView();
-                    listener.updatePlayerCfg();
-                    listener.replay();
-                    // hideBottom();
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
+                showPlayerSelectDialog();
             }
         });
         mPlayerIJKBtn.setOnClickListener(new OnClickListener() {
@@ -355,7 +337,7 @@ public class VodController extends BaseController {
     void updatePlayerCfgView() {
         try {
             int playerType = mPlayerConfig.getInt("pl");
-            mPlayerBtn.setText(PlayerHelper.getPlayerName(playerType));
+            mPlayerBtn.setText(PlayerHelper.getPlayerShortName(playerType));
             mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
             mPlayerIJKBtn.setText(mPlayerConfig.getString("ijk"));
             mPlayerIJKBtn.setVisibility(playerType == 1 ? VISIBLE : GONE);
@@ -395,6 +377,106 @@ public class VodController extends BaseController {
 
     public void setListener(VodControlListener listener) {
         this.listener = listener;
+    }
+
+    private void showPlayerSelectDialog() {
+        if (mPlayerConfig == null) {
+            return;
+        }
+        final ArrayList<PlayerOption> options = new ArrayList<>();
+        options.add(new PlayerOption(0, "系统"));
+        if (PlayerHelper.isIjkAvailable()) {
+            options.add(new PlayerOption(1, "IJK"));
+        }
+        options.add(new PlayerOption(2, "Exo"));
+        if (mxPlayerExist || reexPlayerExist) {
+            options.add(new PlayerOption(-1, "外部播放器"));
+        }
+        int currentPl;
+        try {
+            currentPl = mPlayerConfig.getInt("pl");
+        } catch (JSONException e) {
+            e.printStackTrace();
+            return;
+        }
+        int defaultPos = 0;
+        for (int i = 0; i < options.size(); i++) {
+            PlayerOption opt = options.get(i);
+            if (opt.playType == currentPl) {
+                defaultPos = i;
+                break;
+            }
+            if (opt.playType == -1 && (currentPl == 10 || currentPl == 11)) {
+                defaultPos = i;
+                break;
+            }
+        }
+        SelectDialog<PlayerOption> dialog = new SelectDialog<>(getContext());
+        dialog.setTip("请选择播放器");
+        dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<PlayerOption>() {
+            @Override
+            public void click(PlayerOption value, int pos) {
+                applyPlayerOption(value);
+            }
+
+            @Override
+            public String getDisplay(PlayerOption val) {
+                return val.name;
+            }
+        }, new DiffUtil.ItemCallback<PlayerOption>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull PlayerOption oldItem, @NonNull PlayerOption newItem) {
+                return oldItem.playType == newItem.playType && oldItem.name.equals(newItem.name);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull PlayerOption oldItem, @NonNull PlayerOption newItem) {
+                return oldItem.playType == newItem.playType && oldItem.name.equals(newItem.name);
+            }
+        }, options, defaultPos);
+        dialog.show();
+    }
+
+    private void applyPlayerOption(PlayerOption option) {
+        if (mPlayerConfig == null || option == null) {
+            return;
+        }
+        try {
+            int newType = option.playType;
+            if (newType == -1) {
+                if (mxPlayerExist) {
+                    newType = 10;
+                } else if (reexPlayerExist) {
+                    newType = 11;
+                } else {
+                    Toast.makeText(getContext(), "未安装外部播放器", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            } else if (newType == 1 && !PlayerHelper.isIjkAvailable()) {
+                Toast.makeText(getContext(), "IJK播放器不可用", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int currentType = mPlayerConfig.getInt("pl");
+            if (currentType == newType) {
+                return;
+            }
+            mPlayerConfig.put("pl", newType);
+            updatePlayerCfgView();
+            listener.updatePlayerCfg();
+            listener.replay();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static class PlayerOption {
+        final int playType;
+        final String name;
+
+        PlayerOption(int playType, String name) {
+            this.playType = playType;
+            this.name = name;
+        }
     }
 
     private VodControlListener listener;

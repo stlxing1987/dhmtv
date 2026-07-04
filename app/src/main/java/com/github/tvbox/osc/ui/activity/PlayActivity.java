@@ -186,6 +186,7 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void replay() {
                 autoRetryCount = 0;
+                blackScreenFallbackAttempt = 0;
                 play();
             }
 
@@ -211,6 +212,7 @@ public class PlayActivity extends BaseActivity {
     }
 
     void errorWithRetry(String err, boolean finish) {
+        cancelBlackScreenCheck();
         if (!autoRetry()) {
             runOnUiThread(new Runnable() {
                 @Override
@@ -231,9 +233,12 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void run() {
                 stopParse();
+                cancelBlackScreenCheck();
                 if (mVideoView != null) {
                     mVideoView.release();
                     if (url != null) {
+                        lastPlayUrl = url;
+                        lastPlayHeaders = headers;
                         try {
                             int playerType = mVodPlayerCfg.getInt("pl");
                             if (playerType >= 10) {
@@ -278,6 +283,7 @@ public class PlayActivity extends BaseActivity {
                         try {
                             mVideoView.start();
                             mController.resetSpeed();
+                            scheduleBlackScreenCheck();
                         } catch (UnsatisfiedLinkError | Exception e) {
                             e.printStackTrace();
                             if (PlayerHelper.fallbackToExo(mVideoView, mVodPlayerCfg)) {
@@ -289,6 +295,7 @@ public class PlayActivity extends BaseActivity {
                                 }
                                 mVideoView.start();
                                 mController.resetSpeed();
+                                scheduleBlackScreenCheck();
                                 Toast.makeText(PlayActivity.this, "IJK不可用，已切换Exo播放器", Toast.LENGTH_SHORT).show();
                             } else {
                                 errorWithRetry("播放失败", true);
@@ -466,6 +473,7 @@ public class PlayActivity extends BaseActivity {
 
     @Override
     protected void onDestroy() {
+        cancelBlackScreenCheck();
         super.onDestroy();
         if (mVideoView != null) {
             mVideoView.release();
@@ -511,6 +519,53 @@ public class PlayActivity extends BaseActivity {
     }
 
     private int autoRetryCount = 0;
+
+    private void scheduleBlackScreenCheck() {
+        cancelBlackScreenCheck();
+        blackScreenCheckRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (mVideoView == null || lastPlayUrl == null) {
+                    return;
+                }
+                if (mVideoView.getCurrentPlayState() != VideoView.STATE_PLAYING) {
+                    return;
+                }
+                int[] size = mVideoView.getVideoSize();
+                if (size[0] > 0 && size[1] > 0) {
+                    blackScreenFallbackAttempt = 0;
+                    return;
+                }
+                tryBlackScreenFallback();
+            }
+        };
+        mHandler.postDelayed(blackScreenCheckRunnable, BLACK_SCREEN_CHECK_DELAY_MS);
+    }
+
+    private void cancelBlackScreenCheck() {
+        if (blackScreenCheckRunnable != null) {
+            mHandler.removeCallbacks(blackScreenCheckRunnable);
+            blackScreenCheckRunnable = null;
+        }
+    }
+
+    private void tryBlackScreenFallback() {
+        if (lastPlayUrl == null || blackScreenFallbackAttempt >= 3) {
+            blackScreenFallbackAttempt = 0;
+            return;
+        }
+        if (!PlayerHelper.tryBlackScreenFallback(mVideoView, mVodPlayerCfg, blackScreenFallbackAttempt)) {
+            blackScreenFallbackAttempt++;
+            scheduleBlackScreenCheck();
+            return;
+        }
+        String tip = PlayerHelper.getBlackScreenFallbackTip(blackScreenFallbackAttempt);
+        blackScreenFallbackAttempt++;
+        mController.setPlayerConfig(mVodPlayerCfg);
+        mVodInfo.playerCfg = mVodPlayerCfg.toString();
+        Toast.makeText(this, tip, Toast.LENGTH_SHORT).show();
+        playUrl(lastPlayUrl, lastPlayHeaders);
+    }
 
     boolean autoRetry() {
         if (autoRetryCount < 3) {
@@ -637,6 +692,11 @@ public class PlayActivity extends BaseActivity {
 
     private String playSubtitle;
     private String progressKey;
+    private static final int BLACK_SCREEN_CHECK_DELAY_MS = 5000;
+    private int blackScreenFallbackAttempt = 0;
+    private Runnable blackScreenCheckRunnable;
+    private String lastPlayUrl;
+    private HashMap<String, String> lastPlayHeaders;
     private String parseFlag;
     private String webUrl;
 

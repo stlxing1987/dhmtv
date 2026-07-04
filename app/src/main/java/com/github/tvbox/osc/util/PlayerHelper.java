@@ -59,13 +59,91 @@ public class PlayerHelper {
     public static boolean fallbackToExo(VideoView videoView, JSONObject playerCfg) {
         try {
             playerCfg.put("pl", 2);
-            Hawk.put(HawkConfig.PLAY_TYPE, 2);
             updateCfg(videoView, playerCfg);
             return true;
         } catch (Throwable t) {
             t.printStackTrace();
             return false;
         }
+    }
+
+    /**
+     * 有声无画时按顺序尝试：Exo→IJK硬解→IJK软解→SurfaceView 渲染。
+     *
+     * @return 是否成功切换
+     */
+    public static boolean tryBlackScreenFallback(VideoView videoView, JSONObject playerCfg, int attempt) {
+        try {
+            int playerType = playerCfg.optInt("pl", 2);
+            int renderType = playerCfg.optInt("pr", 0);
+            String ijkCode = playerCfg.optString("ijk", "硬解码");
+            switch (attempt) {
+                case 0:
+                    if (playerType == 2 && isIjkAvailable()) {
+                        playerCfg.put("pl", 1);
+                        playerCfg.put("ijk", findIjkCodecName(true));
+                        updateCfg(videoView, playerCfg);
+                        return true;
+                    }
+                    break;
+                case 1:
+                    if (playerType == 1) {
+                        String softName = findIjkCodecName(false);
+                        if (!softName.equals(ijkCode)) {
+                            playerCfg.put("ijk", softName);
+                            updateCfg(videoView, playerCfg);
+                            return true;
+                        }
+                    }
+                    break;
+                case 2:
+                    if (renderType == 0) {
+                        playerCfg.put("pr", 1);
+                        updateCfg(videoView, playerCfg);
+                        return true;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+        return false;
+    }
+
+    public static String getBlackScreenFallbackTip(int attempt) {
+        switch (attempt) {
+            case 0:
+                return "检测到黑屏，已切换IJK硬解码";
+            case 1:
+                return "检测到黑屏，已切换IJK软解码";
+            case 2:
+                return "检测到黑屏，已切换SurfaceView渲染";
+            default:
+                return "播放异常";
+        }
+    }
+
+    private static String findIjkCodecName(boolean preferHard) {
+        String hard = null;
+        String soft = null;
+        String first = null;
+        for (IJKCode codec : ApiConfig.get().getIjkCodes()) {
+            String name = codec.getName();
+            if (first == null) {
+                first = name;
+            }
+            if (name.contains("硬") || name.toLowerCase().contains("hw")) {
+                hard = name;
+            } else if (name.contains("软") || name.toLowerCase().contains("sw")) {
+                soft = name;
+            }
+        }
+        if (preferHard) {
+            return hard != null ? hard : (soft != null ? soft : (first != null ? first : "硬解码"));
+        }
+        return soft != null ? soft : (hard != null ? hard : (first != null ? first : "软解码"));
     }
 
     public static void updateCfg(VideoView videoView, JSONObject playerCfg) {
@@ -191,6 +269,20 @@ public class PlayerHelper {
             });
         } catch (Throwable th) {
             th.printStackTrace();
+        }
+    }
+
+    public static String getPlayerShortName(int playType) {
+        if (playType == 1) {
+            return "IJK";
+        } else if (playType == 2) {
+            return "Exo";
+        } else if (playType == 10) {
+            return "MX";
+        } else if (playType == 11) {
+            return "Reex";
+        } else {
+            return "系统";
         }
     }
 

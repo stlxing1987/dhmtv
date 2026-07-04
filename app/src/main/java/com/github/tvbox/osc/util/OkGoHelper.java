@@ -46,6 +46,9 @@ public class OkGoHelper {
         builder.retryOnConnectionFailure(true);
         builder.followRedirects(true);
         builder.followSslRedirects(true);
+        builder.readTimeout(60, TimeUnit.SECONDS);
+        builder.writeTimeout(30, TimeUnit.SECONDS);
+        builder.connectTimeout(15, TimeUnit.SECONDS);
 
 
         try {
