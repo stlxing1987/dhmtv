@@ -46,7 +46,13 @@ jobs:
       - name: Build Debug APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          for attempt in 1 2 3; do
+            echo "Build attempt ${attempt}/3"
+            ./gradlew assembleDebug --no-daemon && exit 0
+            echo "Build failed, wait 20s before retry..."
+            sleep 20
+          done
+          exit 1
 
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
