@@ -15,12 +15,11 @@
         android:required="false" />
     <uses-feature
         android:name="android.hardware.touchscreen"
-        android:required="false" />
+        android:required="true" />
 
     <application
         android:name=".base.App"
         android:allowBackup="true"
-        android:banner="@drawable/app_banner"
         android:configChanges="orientation|keyboardHidden|screenSize"
         android:hardwareAccelerated="true"
         android:icon="@drawable/app_icon"
@@ -32,16 +31,19 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".ui.activity.HomeActivity"
+            android:name=".ui.activity.MobileHomeActivity"
             android:exported="true"
-            android:screenOrientation="landscape">
+            android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.activity.HomeActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
 
         <activity
             android:name=".ui.activity.MobileCategoryActivity"
@@ -49,34 +51,29 @@
             android:screenOrientation="unspecified" />
 
         <activity
-            android:name=".ui.activity.MobileHomeActivity"
-            android:exported="false"
-            android:screenOrientation="unspecified" />
-
-        <activity
             android:name=".ui.activity.LivePlayActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.DetailActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.PlayActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.PushActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.SearchActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.SettingActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.HistoryActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
         <activity
             android:name=".ui.activity.CollectActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="unspecified" />
 
         <receiver
             android:name=".receiver.SearchReceiver"
@@ -105,10 +102,10 @@
 
         <meta-data
             android:name="design_width_in_dp"
-            android:value="1280" />
+            android:value="360" />
         <meta-data
             android:name="design_height_in_dp"
-            android:value="720" />
+            android:value="640" />
 
         <meta-data
             android:name="xwalk_enable_download_mode"

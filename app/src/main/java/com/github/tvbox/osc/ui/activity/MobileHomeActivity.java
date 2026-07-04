@@ -22,7 +22,6 @@ import com.github.tvbox.osc.ui.fragment.MobileMineFragment;
 import com.github.tvbox.osc.util.AppManager;
 import com.github.tvbox.osc.util.AppUpdateHelper;
 import com.github.tvbox.osc.util.SettingUiHelper;
-import com.github.tvbox.osc.util.UiModeSwitcher;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 
 import java.util.ArrayList;
@@ -53,9 +52,6 @@ public class MobileHomeActivity extends BaseActivity {
 
     @Override
     protected void init() {
-        if (UiModeSwitcher.switching) {
-            UiModeSwitcher.switching = false;
-        }
         getWindow().setBackgroundDrawableResource(SettingUiHelper.WALLPAPER_RES[SettingUiHelper.getWallpaperIndex()]);
         ControlManager.get().startServer();
         sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
@@ -244,10 +240,6 @@ public class MobileHomeActivity extends BaseActivity {
         super.onDestroy();
         mHandler.removeCallbacksAndMessages(null);
         ControlManager.get().stopServer();
-        if (UiModeSwitcher.switching) {
-            AppManager.getInstance().finishActivity(this);
-            return;
-        }
         if (isFinishing()) {
             AppManager.getInstance().appExit(0);
         }

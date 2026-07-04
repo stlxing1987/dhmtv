@@ -39,18 +39,9 @@ public class SettingUiHelper {
     }
 
     public static String getUiModeName(int mode) {
-        switch (mode) {
-            case MODE_TABLET:
-                return "平板";
-            case MODE_PHONE:
-                return "手机";
-            default:
-                return "电视";
-        }
+        return "手机";
     }
 
-    public static final int MODE_TV = DeviceHelper.MODE_TV;
-    public static final int MODE_TABLET = DeviceHelper.MODE_TABLET;
     public static final int MODE_PHONE = DeviceHelper.MODE_PHONE;
 
     public static String getDecodeName(String codec) {

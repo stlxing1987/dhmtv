@@ -25,7 +25,7 @@ public final class MobileUiHelper {
     }
 
     public static boolean useMobileUi(Context context) {
-        return DeviceHelper.isPhone(context);
+        return true;
     }
 
     public static int dp(Context context, float dp) {
