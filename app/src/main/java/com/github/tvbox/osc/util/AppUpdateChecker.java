@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
@@ -20,6 +21,7 @@ import com.lzy.okgo.model.Response;
 import com.orhanobut.hawk.Hawk;
 
 import java.io.File;
+import java.util.List;
 
 /**
  * App APK 热更新：拉取 update.json → 下载 APK → 调起安装。
@@ -152,7 +154,13 @@ public final class AppUpdateChecker {
     }
 
     public static void installApk(Context context, File apkFile, int pendingVersionCode) {
-        if (apkFile == null || !apkFile.exists()) {
+        if (apkFile == null || !apkFile.exists() || apkFile.length() < 1024 * 1024) {
+            return;
+        }
+        PackageInfo archiveInfo = context.getPackageManager()
+                .getPackageArchiveInfo(apkFile.getAbsolutePath(), 0);
+        if (archiveInfo == null) {
+            apkFile.delete();
             return;
         }
         if (pendingVersionCode > 0) {
@@ -166,6 +174,14 @@ public final class AppUpdateChecker {
         intent.setDataAndType(uri, "application/vnd.android.package-archive");
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        List<ResolveInfo> installers = context.getPackageManager()
+                .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+        for (ResolveInfo installer : installers) {
+            context.grantUriPermission(
+                    installer.activityInfo.packageName,
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
         context.startActivity(intent);
     }
 

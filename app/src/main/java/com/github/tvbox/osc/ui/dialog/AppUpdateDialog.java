@@ -172,10 +172,30 @@ public class AppUpdateDialog extends BaseDialog {
                     @Override
                     public void onSuccess(Response<File> response) {
                         downloading = false;
+                        File apk = response.body();
+                        if (apk == null || !apk.exists() || apk.length() < 1024 * 1024
+                                || getContext().getPackageManager()
+                                .getPackageArchiveInfo(apk.getAbsolutePath(), 0) == null) {
+                            if (apk != null && apk.exists()) {
+                                apk.delete();
+                            }
+                            btnUpdateLater.setEnabled(!updateInfo.forceUpdate);
+                            btnUpdateNow.setEnabled(true);
+                            btnUpdateLater.setFocusable(!updateInfo.forceUpdate);
+                            btnUpdateNow.setFocusable(true);
+                            progressUpdate.setVisibility(View.GONE);
+                            tvUpdateProgress.setVisibility(View.GONE);
+                            Toast.makeText(getContext(),
+                                    "安装包下载不完整，请重试",
+                                    Toast.LENGTH_LONG).show();
+                            focusIndex = focusButtons.size() - 1;
+                            focusDefaultButton();
+                            return;
+                        }
                         dismiss();
                         AppUpdateChecker.installApk(
                                 getContext(),
-                                response.body(),
+                                apk,
                                 updateInfo.versionCode);
                     }
 

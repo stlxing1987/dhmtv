@@ -27,9 +27,9 @@ jobs:
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
           case "$BRANCH" in
-            master) PLATFORM=tv; UPDATE_FILE=docs/update-tv.json; TAG_SUFFIX=-tv; APK_NAME=app-tv-debug.apk ;;
-            phone)  PLATFORM=phone; UPDATE_FILE=docs/update-phone.json; TAG_SUFFIX=-phone; APK_NAME=app-phone-debug.apk ;;
-            tablet) PLATFORM=tablet; UPDATE_FILE=docs/update-tablet.json; TAG_SUFFIX=-tablet; APK_NAME=app-tablet-debug.apk ;;
+            master) PLATFORM=tv; UPDATE_FILE=docs/update-tv.json; TAG_SUFFIX=-tv; APK_NAME=app-tv.apk ;;
+            phone)  PLATFORM=phone; UPDATE_FILE=docs/update-phone.json; TAG_SUFFIX=-phone; APK_NAME=app-phone.apk ;;
+            tablet) PLATFORM=tablet; UPDATE_FILE=docs/update-tablet.json; TAG_SUFFIX=-tablet; APK_NAME=app-tablet.apk ;;
             *) echo "Unsupported branch: $BRANCH"; exit 1 ;;
           esac
           echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
@@ -58,7 +58,7 @@ jobs:
       - name: Accept SDK licenses
         run: yes | sdkmanager --licenses
 
-      - name: Build Debug APK
+      - name: Build signed APK
         env:
           GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000
         run: |
