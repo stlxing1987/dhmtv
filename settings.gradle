@@ -9,7 +9,9 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
         if (System.getenv("CI") != null) {
-            // GitHub Actions 上阿里云镜像经常 502，改用腾讯云镜像作备用
+            maven { url 'https://maven.aliyun.com/repository/google' }
+            maven { url 'https://maven.aliyun.com/repository/public' }
+            maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
             maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
         }
     }
@@ -26,6 +28,8 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { url "https://jitpack.io" }
         if (System.getenv("CI") != null) {
+            maven { url 'https://maven.aliyun.com/repository/google' }
+            maven { url 'https://maven.aliyun.com/repository/public' }
             maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
         }
     }

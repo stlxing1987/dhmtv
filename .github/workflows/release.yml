@@ -44,13 +44,15 @@ jobs:
         run: yes | sdkmanager --licenses
 
       - name: Build Debug APK
+        env:
+          GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000
         run: |
           chmod +x gradlew
-          for attempt in 1 2 3; do
-            echo "Build attempt ${attempt}/3"
+          for attempt in 1 2 3 4 5; do
+            echo "Build attempt ${attempt}/5"
             ./gradlew assembleDebug --no-daemon && exit 0
-            echo "Build failed, wait 20s before retry..."
-            sleep 20
+            echo "Build failed, wait 30s before retry..."
+            sleep 30
           done
           exit 1
 
