@@ -39,10 +39,10 @@ public class SettingUiHelper {
     }
 
     public static String getUiModeName(int mode) {
-        return "电视";
+        return "平板";
     }
 
-    public static final int MODE_TV = DeviceHelper.MODE_TV;
+    public static final int MODE_TABLET = DeviceHelper.MODE_TABLET;
 
     public static String getDecodeName(String codec) {
         if (codec == null || codec.isEmpty()) {

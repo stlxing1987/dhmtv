@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">大花喵TV</string>
-    <!-- TV 专版热更新：填 update-tv.json 地址 -->
-    <string name="app_update_url" translatable="false">https://gh-proxy.com/https://raw.githubusercontent.com/stlxing1987/dhmtv/master/docs/update-tv.json</string>
+    <string name="app_name">大花喵平板</string>
+    <string name="app_update_url" translatable="false">https://gh-proxy.com/https://raw.githubusercontent.com/stlxing1987/dhmtv/tablet/docs/update-tablet.json</string>
 </resources>

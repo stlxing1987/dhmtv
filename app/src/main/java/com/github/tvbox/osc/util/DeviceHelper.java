@@ -6,32 +6,32 @@ import android.content.pm.ActivityInfo;
 import com.orhanobut.hawk.Hawk;
 
 /**
- * TV 专版：固定电视 UI 模式，无运行时切换。
+ * 平板专版：固定平板 UI 模式（横屏 TV 界面 + 平板设计尺寸）。
  */
 public class DeviceHelper {
 
-    public static final int MODE_TV = 0;
+    public static final int MODE_TABLET = 1;
 
     private DeviceHelper() {
     }
 
     public static void initDeviceMode(Context context) {
-        Hawk.put(HawkConfig.UI_MODE, MODE_TV);
+        Hawk.put(HawkConfig.UI_MODE, MODE_TABLET);
         if (!Hawk.contains(HawkConfig.HOME_GRID_COLS)) {
             Hawk.put(HawkConfig.HOME_GRID_COLS, 5);
         }
     }
 
     public static int getMode(Context context) {
-        return MODE_TV;
+        return MODE_TABLET;
     }
 
     public static boolean isTv(Context context) {
-        return true;
+        return false;
     }
 
     public static boolean isTablet(Context context) {
-        return false;
+        return true;
     }
 
     public static boolean isPhone(Context context) {
@@ -43,11 +43,11 @@ public class DeviceHelper {
     }
 
     public static float getDesignWidthDp(Context context) {
-        return 1280f;
+        return 960f;
     }
 
     public static float getDesignHeightDp(Context context) {
-        return 720f;
+        return 540f;
     }
 
     public static int getDefaultGridCols() {
