@@ -31,7 +31,6 @@ import com.github.tvbox.osc.ui.dialog.QuickSearchDialog;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.MD5;
-import com.github.tvbox.osc.util.MobileUiHelper;
 import com.github.tvbox.osc.util.PlayLauncher;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.google.gson.Gson;
@@ -96,12 +95,10 @@ public class DetailActivity extends BaseActivity {
     boolean seriesSelect = false;
     private View seriesFlagFocus = null;
     private int groupIndex = 0;
-    private boolean mobileUi;
 
     @Override
     protected int getLayoutResID() {
-        mobileUi = MobileUiHelper.useMobileUi(this);
-        return mobileUi ? R.layout.activity_detail_mobile : R.layout.activity_detail;
+        return R.layout.activity_detail;
     }
 
     @Override
@@ -130,16 +127,8 @@ public class DetailActivity extends BaseActivity {
         tvQuickSearch = findViewById(R.id.tvQuickSearch);
         mEmptyPlayList = findViewById(R.id.mEmptyPlaylist);
         mGridView = findViewById(R.id.mGridView);
-        mGridView.setHasFixedSize(!mobileUi);
-        if (mobileUi) {
-            View btnBack = findViewById(R.id.btnBack);
-            if (btnBack != null) {
-                btnBack.setOnClickListener(v -> finish());
-            }
-            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, MobileUiHelper.getHomeGridColumns(this)));
-        } else {
-            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, isBaseOnWidth() ? 6 : 7));
-        }
+        mGridView.setHasFixedSize(true);
+        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, isBaseOnWidth() ? 6 : 7));
         seriesAdapter = new SeriesAdapter();
         mGridView.setAdapter(seriesAdapter);
         mGridViewFlag = findViewById(R.id.mGridViewFlag);
@@ -423,10 +412,6 @@ public class DetailActivity extends BaseActivity {
                     vodInfo.sourceKey = mVideo.sourceKey;
 
                     tvName.setText(mVideo.name);
-                    TextView toolbarTitle = findViewById(R.id.tvToolbarTitle);
-                    if (toolbarTitle != null) {
-                        toolbarTitle.setText(mVideo.name);
-                    }
                     setTextShow(tvSite, "来源：", ApiConfig.get().getSource(mVideo.sourceKey) != null
                             ? ApiConfig.get().getSource(mVideo.sourceKey).getName() : mVideo.sourceKey);
                     setTextShow(tvYear, "年份：", mVideo.year == 0 ? "" : String.valueOf(mVideo.year));
@@ -437,19 +422,15 @@ public class DetailActivity extends BaseActivity {
                     setTextShow(tvDirector, "导演：", mVideo.director);
                     setTextShow(tvDes, "内容简介：", removeHtmlTag(mVideo.des));
                     if (!TextUtils.isEmpty(mVideo.pic)) {
-                        if (mobileUi) {
-                            MobileUiHelper.loadPoster(mContext, ivThumb, mVideo.pic, mVideo.pic + mVideo.name);
-                        } else {
-                            Picasso.get()
-                                    .load(DefaultConfig.checkReplaceProxy(mVideo.pic))
-                                    .transform(new RoundTransformation(MD5.string2MD5(mVideo.pic + mVideo.name))
-                                            .centerCorp(true)
-                                            .override(AutoSizeUtils.mm2px(mContext, 300), AutoSizeUtils.mm2px(mContext, 400))
-                                            .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
-                                    .placeholder(R.drawable.img_loading_placeholder)
-                                    .error(R.drawable.img_loading_placeholder)
-                                    .into(ivThumb);
-                        }
+                        Picasso.get()
+                                .load(DefaultConfig.checkReplaceProxy(mVideo.pic))
+                                .transform(new RoundTransformation(MD5.string2MD5(mVideo.pic + mVideo.name))
+                                        .centerCorp(true)
+                                        .override(AutoSizeUtils.mm2px(mContext, 300), AutoSizeUtils.mm2px(mContext, 400))
+                                        .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
+                                .placeholder(R.drawable.img_loading_placeholder)
+                                .error(R.drawable.img_loading_placeholder)
+                                .into(ivThumb);
                     } else {
                         ivThumb.setImageResource(R.drawable.img_loading_placeholder);
                     }

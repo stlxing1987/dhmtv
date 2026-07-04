@@ -47,7 +47,6 @@ import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.SettingUiHelper;
-import com.github.tvbox.osc.util.UiModeSwitcher;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.orhanobut.hawk.Hawk;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
@@ -100,8 +99,6 @@ public class HomeActivity extends BaseActivity {
     }
 
     boolean useCacheConfig = false;
-    private boolean redirectingToMobile = false;
-
     public void reloadConfig(boolean useCache) {
         useCacheConfig = useCache;
         dataInitOk = false;
@@ -127,15 +124,6 @@ public class HomeActivity extends BaseActivity {
 
     @Override
     protected void init() {
-        if (UiModeSwitcher.switching) {
-            UiModeSwitcher.switching = false;
-        }
-        if (com.github.tvbox.osc.util.DeviceHelper.isPhone(this)) {
-            redirectingToMobile = true;
-            startActivity(new android.content.Intent(this, MobileHomeActivity.class));
-            finish();
-            return;
-        }
         getWindow().setBackgroundDrawableResource(SettingUiHelper.WALLPAPER_RES[SettingUiHelper.getWallpaperIndex()]);
         EventBus.getDefault().register(this);
         ControlManager.get().startServer();
@@ -615,10 +603,6 @@ public class HomeActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (redirectingToMobile || UiModeSwitcher.switching) {
-            AppManager.getInstance().finishActivity(this);
-            return;
-        }
         EventBus.getDefault().unregister(this);
         AppManager.getInstance().appExit(0);
         ControlManager.get().stopServer();

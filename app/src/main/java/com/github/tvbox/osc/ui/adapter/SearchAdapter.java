@@ -7,16 +7,15 @@ import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
-import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.Movie;
 import com.github.tvbox.osc.bean.SourceBean;
-import com.github.tvbox.osc.util.MobileUiHelper;
+import com.github.tvbox.osc.util.UiHelper;
 
 import java.util.ArrayList;
 
 public class SearchAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
     public SearchAdapter() {
-        super(MobileUiHelper.getSearchItemLayout(App.getInstance()), new ArrayList<>());
+        super(UiHelper.getSearchItemLayout(), new ArrayList<>());
     }
 
     @Override
@@ -32,6 +31,6 @@ public class SearchAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder>
         }
         ImageView ivThumb = helper.getView(R.id.ivThumb);
         String cacheKey = item.pic + "position=" + helper.getLayoutPosition();
-        MobileUiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
+        UiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
     }
 }

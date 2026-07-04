@@ -20,7 +20,6 @@ import com.github.tvbox.osc.ui.adapter.SettingPageAdapter;
 import com.github.tvbox.osc.ui.fragment.ModelSettingFragment;
 import com.github.tvbox.osc.util.AppManager;
 import com.github.tvbox.osc.util.HawkConfig;
-import com.github.tvbox.osc.util.MobileUiHelper;
 import com.orhanobut.hawk.Hawk;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
 import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
@@ -47,12 +46,9 @@ public class SettingActivity extends BaseActivity {
     private String currentApi;
     private int homeRec;
     private int dnsOpt;
-    private boolean mobileUi;
-
     @Override
     protected int getLayoutResID() {
-        mobileUi = MobileUiHelper.useMobileUi(this);
-        return mobileUi ? R.layout.activity_setting_mobile : R.layout.activity_setting;
+        return R.layout.activity_setting;
     }
 
     @Override
@@ -64,13 +60,6 @@ public class SettingActivity extends BaseActivity {
     private void initView() {
         mGridView = findViewById(R.id.mGridView);
         mViewPager = findViewById(R.id.mViewPager);
-        if (mobileUi) {
-            View btnBack = findViewById(R.id.btnBack);
-            if (btnBack != null) {
-                btnBack.setOnClickListener(v -> finish());
-            }
-            return;
-        }
         sortAdapter = new SettingMenuAdapter();
         mGridView.setAdapter(sortAdapter);
         mGridView.setLayoutManager(new V7LinearLayoutManager(this.mContext, 1, false));
@@ -120,11 +109,9 @@ public class SettingActivity extends BaseActivity {
         homeSourceKey = ApiConfig.get().getHomeSourceBean().getKey();
         homeRec = Hawk.get(HawkConfig.HOME_REC, 0);
         dnsOpt = Hawk.get(HawkConfig.DOH_URL, 0);
-        if (!mobileUi) {
-            List<String> sortList = new ArrayList<>();
-            sortList.add("设置其他");
-            sortAdapter.setNewData(sortList);
-        }
+        List<String> sortList = new ArrayList<>();
+        sortList.add("设置其他");
+        sortAdapter.setNewData(sortList);
         initViewPager();
     }
 

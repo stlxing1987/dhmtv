@@ -13,7 +13,6 @@ import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.base.BaseActivity;
 import com.github.tvbox.osc.ui.activity.HomeActivity;
-import com.github.tvbox.osc.ui.activity.MobileHomeActivity;
 import com.github.tvbox.osc.ui.adapter.ApiHistoryDialogAdapter;
 import com.github.tvbox.osc.ui.dialog.ApiDialog;
 import com.github.tvbox.osc.ui.dialog.ApiHistoryDialog;
@@ -104,23 +103,7 @@ public class ConfigDialogHelper {
             home.reloadConfig(useCache);
             return;
         }
-        MobileHomeActivity mobileHome = findMobileHomeActivity(activity);
-        if (mobileHome != null) {
-            mobileHome.reloadConfig(useCache);
-            return;
-        }
         restartApp(activity, useCache);
-    }
-
-    private static MobileHomeActivity findMobileHomeActivity(BaseActivity activity) {
-        if (activity instanceof MobileHomeActivity && !activity.isFinishing()) {
-            return (MobileHomeActivity) activity;
-        }
-        Activity found = AppManager.getInstance().getActivity(MobileHomeActivity.class);
-        if (found instanceof MobileHomeActivity && !found.isFinishing()) {
-            return (MobileHomeActivity) found;
-        }
-        return null;
     }
 
     private static HomeActivity findHomeActivity(BaseActivity activity) {

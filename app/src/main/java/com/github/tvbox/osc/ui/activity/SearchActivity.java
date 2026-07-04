@@ -32,7 +32,6 @@ import com.github.tvbox.osc.ui.dialog.RemoteDialog;
 import com.github.tvbox.osc.ui.tv.widget.SearchKeyboard;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
-import com.github.tvbox.osc.util.MobileUiHelper;
 import com.github.tvbox.osc.util.PinyinSearchHelper;
 import com.github.tvbox.osc.util.SearchHistoryHelper;
 import com.github.tvbox.osc.util.SearchHotHelper;
@@ -111,7 +110,6 @@ public class SearchActivity extends BaseActivity {
     private final List<Movie.Video> allSearchResults = new ArrayList<>();
     private String selectedSourceKey = null;
     private int displayMode = MODE_BROWSE;
-    private boolean mobileUi;
 
     private List<Runnable> pauseRunnable = null;
     private ExecutorService searchExecutorService = null;
@@ -119,8 +117,7 @@ public class SearchActivity extends BaseActivity {
 
     @Override
     protected int getLayoutResID() {
-        mobileUi = MobileUiHelper.useMobileUi(this);
-        return mobileUi ? R.layout.activity_search_mobile : R.layout.activity_search;
+        return R.layout.activity_search;
     }
 
     @Override
@@ -133,7 +130,7 @@ public class SearchActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (!mobileUi && displayMode == MODE_RESULT && !allSearchResults.isEmpty()) {
+        if (displayMode == MODE_RESULT && !allSearchResults.isEmpty()) {
             showResultMode();
             filterAndDisplayResults();
         }
@@ -186,60 +183,11 @@ public class SearchActivity extends BaseActivity {
             public void onClick(View v) {
                 FastClickCheckUtil.check(v);
                 etSearch.setText("");
-                if (!mobileUi) {
-                    showDefaultHot();
-                }
+                showDefaultHot();
             }
         });
 
-        if (mobileUi) {
-            initMobileView();
-        } else {
-            initTvView();
-        }
-    }
-
-    private void initMobileView() {
-        llLayout = findViewById(R.id.llLayout);
-        tvAddress = findViewById(R.id.tvAddress);
-        ivQRCode = findViewById(R.id.ivQRCode);
-        mGridViewWord = findViewById(R.id.mGridViewWord);
-        mGridViewWord.setHasFixedSize(true);
-        mGridViewWord.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
-        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, MobileUiHelper.getHomeGridColumns(this)));
-
-        wordAdapter = new PinyinAdapter();
-        mGridViewWord.setAdapter(wordAdapter);
-        wordAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                search(wordAdapter.getItem(position));
-            }
-        });
-
-        View btnBack = findViewById(R.id.btnBack);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> finish());
-        }
-        etSearch.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH
-                    || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
-                triggerSearch();
-                return true;
-            }
-            return false;
-        });
-
-        if (keyboard != null && keyboard.getVisibility() == View.VISIBLE) {
-            keyboard.setOnSearchKeyListener(new SearchKeyboard.OnSearchKeyListener() {
-                @Override
-                public void onSearchKey(int pos, String key) {
-                    handleLegacyKeyboardInput(pos, key);
-                }
-            });
-        }
-
-        setLoadSir(llLayout);
+        initTvView();
     }
 
     private void initTvView() {
@@ -404,45 +352,10 @@ public class SearchActivity extends BaseActivity {
      */
     private void loadRec(String key) {
         if (TextUtils.isEmpty(key)) {
-            if (!mobileUi) {
-                showDefaultHot();
-            }
+            showDefaultHot();
             return;
         }
-        if (mobileUi) {
-            loadRecMobile(key);
-        } else {
-            loadRecTv(key);
-        }
-    }
-
-    private void loadRecMobile(String key) {
-        if (PinyinSearchHelper.isLatinInput(key)) {
-            List<String> local = PinyinSearchHelper.matchLatin(key, searchCorpus);
-            if (!local.isEmpty()) {
-                wordAdapter.setNewData(local);
-            }
-        }
-        SearchSuggestHelper.fetch(key, new SearchSuggestHelper.Callback() {
-            @Override
-            public void onResult(List<String> titles) {
-                LinkedHashSet<String> merged = new LinkedHashSet<>();
-                if (PinyinSearchHelper.isLatinInput(key)) {
-                    merged.addAll(PinyinSearchHelper.matchLatin(key, searchCorpus));
-                }
-                merged.addAll(titles);
-                ArrayList<String> list = new ArrayList<>(merged);
-                addToCorpus(list);
-                if (!list.isEmpty()) {
-                    wordAdapter.setNewData(list);
-                }
-            }
-
-            @Override
-            public void onError() {
-                fallbackLocalRecMobile(key);
-            }
-        });
+        loadRecTv(key);
     }
 
     private void loadRecTv(String key) {
@@ -503,15 +416,6 @@ public class SearchActivity extends BaseActivity {
         return new ArrayList<>(matched);
     }
 
-    private void fallbackLocalRecMobile(String key) {
-        if (PinyinSearchHelper.isLatinInput(key)) {
-            List<String> local = PinyinSearchHelper.matchLatin(key, searchCorpus);
-            if (!local.isEmpty()) {
-                wordAdapter.setNewData(local);
-            }
-        }
-    }
-
     private void showSuggestions(List<String> words) {
         if (displayMode == MODE_RESULT || hotAdapter == null) {
             return;
@@ -544,11 +448,7 @@ public class SearchActivity extends BaseActivity {
     }
 
     private void initData() {
-        if (!mobileUi) {
-            loadHotSections();
-        } else {
-            loadMobileHotWords();
-        }
+        loadHotSections();
 
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("title")) {
@@ -559,45 +459,6 @@ public class SearchActivity extends BaseActivity {
             showLoading();
             search(title);
         }
-    }
-
-    private void loadMobileHotWords() {
-        ArrayList<String> fallbackHots = new ArrayList<>();
-        fallbackHots.add("完美世界");
-        fallbackHots.add("镖人");
-        fallbackHots.add("爱情有烟火");
-        fallbackHots.add("庆余年");
-        fallbackHots.add("斗罗大陆");
-        addToCorpus(fallbackHots);
-        wordAdapter.setNewData(fallbackHots);
-        OkGo.<String>get("https://node.video.qq.com/x/api/hot_mobilesearch")
-                .params("channdlId", "0")
-                .params("_", System.currentTimeMillis())
-                .execute(new AbsCallback<String>() {
-                    @Override
-                    public void onSuccess(Response<String> response) {
-                        try {
-                            ArrayList<String> hots = new ArrayList<>();
-                            JsonArray itemList = JsonParser.parseString(response.body())
-                                    .getAsJsonObject().get("data").getAsJsonObject()
-                                    .get("itemList").getAsJsonArray();
-                            for (JsonElement ele : itemList) {
-                                JsonObject obj = (JsonObject) ele;
-                                hots.add(obj.get("title").getAsString().trim()
-                                        .replaceAll("<|>|《|》|-", "").split(" ")[0]);
-                            }
-                            addToCorpus(hots);
-                            wordAdapter.setNewData(hots);
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                    }
-
-                    @Override
-                    public String convertResponse(okhttp3.Response response) throws Throwable {
-                        return response.body().string();
-                    }
-                });
     }
 
     private void loadHotSections() {
@@ -653,17 +514,12 @@ public class SearchActivity extends BaseActivity {
         SearchHistoryHelper.add(title);
         this.searchTitle = title;
 
-        if (mobileUi) {
-            mGridView.setVisibility(View.INVISIBLE);
-            searchAdapter.setNewData(new ArrayList<>());
-        } else {
-            showResultMode();
-            refreshHistory();
-            allSearchResults.clear();
-            selectedSourceKey = null;
-            searchAdapter.setNewData(new ArrayList<>());
-            updateSourceFilterList();
-        }
+        showResultMode();
+        refreshHistory();
+        allSearchResults.clear();
+        selectedSourceKey = null;
+        searchAdapter.setNewData(new ArrayList<>());
+        updateSourceFilterList();
 
         if (PinyinSearchHelper.isLatinInput(title)) {
             List<String> keywords = PinyinSearchHelper.resolveSearchKeywords(title, searchCorpus);
@@ -685,9 +541,6 @@ public class SearchActivity extends BaseActivity {
             @Override
             public void onResult(List<String> titles) {
                 addToCorpus(titles);
-                if (mobileUi && wordAdapter != null) {
-                    wordAdapter.setNewData(titles);
-                }
                 searchKeywords = titles;
                 searchResult();
             }
@@ -707,17 +560,12 @@ public class SearchActivity extends BaseActivity {
             return;
         }
         showEmpty();
-        Toast.makeText(mContext, mobileUi
-                ? "未识别简拼「" + latin + "」，请从上方选择片名"
-                : "未识别简拼「" + latin + "」，请从热门或历史中选择片名", Toast.LENGTH_LONG).show();
+        Toast.makeText(mContext, "未识别简拼「" + latin + "」，请从热门或历史中选择片名", Toast.LENGTH_LONG).show();
     }
 
     private void searchResult() {
         stopSearchExecutor();
         allRunCount.set(0);
-        if (mobileUi) {
-            searchAdapter.setNewData(new ArrayList<>());
-        }
         searchExecutorService = Executors.newFixedThreadPool(getSearchThreadCount());
         List<SourceBean> searchRequestList = new ArrayList<>(ApiConfig.get().getSourceBeanList());
         SourceBean home = ApiConfig.get().getHomeSourceBean();
@@ -753,51 +601,7 @@ public class SearchActivity extends BaseActivity {
     }
 
     private void searchData(AbsXml absXml) {
-        if (mobileUi) {
-            searchDataMobile(absXml);
-        } else {
-            searchDataTv(absXml);
-        }
-    }
-
-    private void searchDataMobile(AbsXml absXml) {
-        if (absXml != null && absXml.movie != null && absXml.movie.videoList != null
-                && absXml.movie.videoList.size() > 0) {
-            List<Movie.Video> data = new ArrayList<>();
-            Set<String> exists = new HashSet<>();
-            for (Movie.Video old : searchAdapter.getData()) {
-                exists.add(old.sourceKey + "|" + old.id + "|" + old.name);
-            }
-            for (Movie.Video video : absXml.movie.videoList) {
-                if (video != null && video.name != null && !video.name.isEmpty()
-                        && video.id != null && !video.id.isEmpty()) {
-                    String dedupeKey = video.sourceKey + "|" + video.id + "|" + video.name;
-                    if (!exists.contains(dedupeKey)) {
-                        exists.add(dedupeKey);
-                        data.add(video);
-                    }
-                }
-            }
-            if (searchAdapter.getData().size() > 0) {
-                searchAdapter.addData(data);
-            } else {
-                showSuccess();
-                mGridView.setVisibility(View.VISIBLE);
-                searchAdapter.setNewData(data);
-            }
-        }
-
-        int count = allRunCount.decrementAndGet();
-        if (count <= 0) {
-            if (searchAdapter.getData().size() <= 0) {
-                showEmpty();
-                if (searchTitle != null && PinyinSearchHelper.isLatinInput(searchTitle)) {
-                    Toast.makeText(mContext, "简拼「" + searchTitle + "」未搜到结果，可尝试上方推荐片名",
-                            Toast.LENGTH_LONG).show();
-                }
-            }
-            stopSearchExecutor();
-        }
+        searchDataTv(absXml);
     }
 
     private void searchDataTv(AbsXml absXml) {
@@ -894,7 +698,7 @@ public class SearchActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
-        if (!mobileUi && displayMode == MODE_RESULT) {
+        if (displayMode == MODE_RESULT) {
             showBrowseMode();
             showSuccess();
             return;
@@ -904,7 +708,7 @@ public class SearchActivity extends BaseActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (!mobileUi && event.getAction() == KeyEvent.ACTION_DOWN
+        if (event.getAction() == KeyEvent.ACTION_DOWN
                 && event.getKeyCode() == KeyEvent.KEYCODE_BACK
                 && displayMode == MODE_RESULT) {
             onBackPressed();

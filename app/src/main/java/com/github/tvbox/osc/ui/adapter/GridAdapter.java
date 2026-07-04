@@ -9,9 +9,8 @@ import android.widget.TextView;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
-import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.Movie;
-import com.github.tvbox.osc.util.MobileUiHelper;
+import com.github.tvbox.osc.util.UiHelper;
 
 import java.util.ArrayList;
 
@@ -24,7 +23,7 @@ public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
     private int previewWidth;
 
     public GridAdapter() {
-        super(MobileUiHelper.getGridItemLayout(App.getInstance()), new ArrayList<>());
+        super(UiHelper.getGridItemLayout(), new ArrayList<>());
     }
 
     public void setPreviewWidth(int previewWidth) {
@@ -54,7 +53,7 @@ public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
         helper.setText(R.id.tvActor, item.actor);
         ImageView ivThumb = helper.getView(R.id.ivThumb);
         String cacheKey = item.pic + "position=" + helper.getLayoutPosition();
-        MobileUiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
+        UiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
         if (previewWidth > 0) {
             ViewGroup.LayoutParams lp = helper.itemView.getLayoutParams();
             if (lp == null) {

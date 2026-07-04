@@ -6,9 +6,8 @@ import android.widget.TextView;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
-import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.VodInfo;
-import com.github.tvbox.osc.util.MobileUiHelper;
+import com.github.tvbox.osc.util.UiHelper;
 
 import java.util.ArrayList;
 
@@ -19,7 +18,7 @@ import java.util.ArrayList;
  */
 public class SeriesAdapter extends BaseQuickAdapter<VodInfo.VodSeries, BaseViewHolder> {
     public SeriesAdapter() {
-        super(MobileUiHelper.getSeriesItemLayout(App.getInstance()), new ArrayList<>());
+        super(UiHelper.getSeriesItemLayout(), new ArrayList<>());
     }
 
     @Override

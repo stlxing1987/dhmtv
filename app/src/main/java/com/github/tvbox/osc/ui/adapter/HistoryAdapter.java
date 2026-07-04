@@ -8,9 +8,8 @@ import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
-import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.VodInfo;
-import com.github.tvbox.osc.util.MobileUiHelper;
+import com.github.tvbox.osc.util.UiHelper;
 
 import java.util.ArrayList;
 
@@ -21,7 +20,7 @@ import java.util.ArrayList;
  */
 public class HistoryAdapter extends BaseQuickAdapter<VodInfo, BaseViewHolder> {
     public HistoryAdapter() {
-        super(MobileUiHelper.getGridItemLayout(App.getInstance()), new ArrayList<>());
+        super(UiHelper.getGridItemLayout(), new ArrayList<>());
     }
 
     @Override
@@ -34,6 +33,6 @@ public class HistoryAdapter extends BaseQuickAdapter<VodInfo, BaseViewHolder> {
         helper.setText(R.id.tvName, item.name);
         ImageView ivThumb = helper.getView(R.id.ivThumb);
         String cacheKey = item.pic + item.name;
-        MobileUiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
+        UiHelper.loadPoster(mContext, ivThumb, item.pic, cacheKey);
     }
 }
