@@ -23,6 +23,15 @@ public class IjkMediaPlayer extends IjkPlayer {
     @Override
     public void setOptions() {
         super.setOptions();
+        // 限制缓冲与丢帧，避免 4K 高码率占满内存导致系统卡顿、画面像慢放
+        try {
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_PLAYER, "max-buffer-size", 32 * 1024 * 1024L);
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1L);
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 512 * 1024L);
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 500000L);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         IJKCode codecTmp = this.codec == null ? ApiConfig.get().getCurrentIJKCode() : this.codec;
         LinkedHashMap<String, String> options = codecTmp.getOption();
         if (options != null) {

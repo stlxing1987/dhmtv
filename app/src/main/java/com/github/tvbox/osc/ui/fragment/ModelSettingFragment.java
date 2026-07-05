@@ -159,8 +159,8 @@ public class ModelSettingFragment extends BaseLazyFragment {
         setCellValue(R.id.llHistoryCount, SettingUiHelper.getHistoryCountName(Hawk.get(HawkConfig.HISTORY_COUNT, 30)));
         setCellValue(R.id.llSearchThread, String.valueOf(Hawk.get(HawkConfig.SEARCH_THREAD, 16)));
         setCellValue(R.id.llRender, PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, 0)));
-        setCellValue(R.id.llExoBuffer, Hawk.get(HawkConfig.EXO_BUFFER, 50) + "s");
-        setCellValue(R.id.llExoCache, Hawk.get(HawkConfig.EXO_CACHE, false) ? "启用" : "禁用");
+        setCellValue(R.id.llExoBuffer, Hawk.get(HawkConfig.EXO_BUFFER, 20) + "s");
+        setCellValue(R.id.llExoCache, Hawk.get(HawkConfig.EXO_CACHE, true) ? "启用" : "禁用");
         setCellValue(R.id.llParseWebVew, Hawk.get(HawkConfig.PARSE_WEBVIEW, true) ? "系统自带" : "XWalkView");
         SourceBean home = ApiConfig.get().getHomeSourceBean();
         setCellValue(R.id.llHomeApi, home != null ? home.getName() : "");
@@ -353,7 +353,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         });
         findViewById(R.id.llExoBuffer).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
-            showIntSelect("请选择EXO缓冲时长", intArray(10, 20, 30, 50), Hawk.get(HawkConfig.EXO_BUFFER, 50),
+            showIntSelect("请选择EXO缓冲时长", intArray(10, 20, 30, 50), Hawk.get(HawkConfig.EXO_BUFFER, 20),
                     val -> val + "s", val -> {
                         Hawk.put(HawkConfig.EXO_BUFFER, val);
                         refreshValues();
@@ -373,7 +373,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         });
         findViewById(R.id.llExoCache).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
-            Hawk.put(HawkConfig.EXO_CACHE, !Hawk.get(HawkConfig.EXO_CACHE, false));
+            Hawk.put(HawkConfig.EXO_CACHE, !Hawk.get(HawkConfig.EXO_CACHE, true));
             refreshValues();
         });
         findViewById(R.id.llResetApp).setOnClickListener(v -> {

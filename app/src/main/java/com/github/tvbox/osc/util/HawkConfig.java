@@ -40,6 +40,7 @@ public class HawkConfig {
     public static final String SEARCH_THREAD = "search_thread";
     public static final String EXO_BUFFER = "exo_buffer";
     public static final String EXO_CACHE = "exo_cache";
+    public static final String EXO_TUNNEL = "exo_tunnel";
     public static final String HOME_GRID_COLS = "home_grid_cols";
     public static final String UI_MODE = "ui_mode";
     public static final String DEVICE_AUTO_DETECTED = "device_auto_detected";

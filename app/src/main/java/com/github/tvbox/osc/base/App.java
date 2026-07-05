@@ -67,6 +67,18 @@ public class App extends MultiDexApplication {
         if (!Hawk.contains(HawkConfig.IJK_CODEC) && PlayerHelper.isIjkAvailable()) {
             Hawk.put(HawkConfig.IJK_CODEC, "硬解码");
         }
+        if (!Hawk.contains(HawkConfig.EXO_BUFFER)) {
+            Hawk.put(HawkConfig.EXO_BUFFER, 20);
+        }
+        if (!Hawk.contains(HawkConfig.EXO_CACHE)) {
+            Hawk.put(HawkConfig.EXO_CACHE, true);
+        }
+        if (!Hawk.contains(HawkConfig.EXO_TUNNEL)) {
+            Hawk.put(HawkConfig.EXO_TUNNEL, true);
+        }
+        if (!Hawk.contains(HawkConfig.PLAY_RENDER) && PlayerHelper.isX86Device()) {
+            Hawk.put(HawkConfig.PLAY_RENDER, 1);
+        }
         if (!Hawk.contains(HawkConfig.SEARCH_VIEW)) {
             Hawk.put(HawkConfig.SEARCH_VIEW, 1);
         }

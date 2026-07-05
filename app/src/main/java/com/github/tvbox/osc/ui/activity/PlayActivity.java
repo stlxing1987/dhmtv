@@ -413,7 +413,7 @@ public class PlayActivity extends BaseActivity {
                 }
             }
             if (!mVodPlayerCfg.has("pr")) {
-                mVodPlayerCfg.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
+                mVodPlayerCfg.put("pr", PlayerHelper.getDefaultRenderType());
             }
             if (!mVodPlayerCfg.has("ijk")) {
                 mVodPlayerCfg.put("ijk", Hawk.get(HawkConfig.IJK_CODEC, ""));
@@ -550,7 +550,7 @@ public class PlayActivity extends BaseActivity {
     }
 
     private void tryBlackScreenFallback() {
-        if (lastPlayUrl == null || blackScreenFallbackAttempt >= 3) {
+        if (lastPlayUrl == null || blackScreenFallbackAttempt >= 4) {
             blackScreenFallbackAttempt = 0;
             return;
         }
@@ -692,7 +692,7 @@ public class PlayActivity extends BaseActivity {
 
     private String playSubtitle;
     private String progressKey;
-    private static final int BLACK_SCREEN_CHECK_DELAY_MS = 5000;
+    private static final int BLACK_SCREEN_CHECK_DELAY_MS = 3000;
     private int blackScreenFallbackAttempt = 0;
     private Runnable blackScreenCheckRunnable;
     private String lastPlayUrl;

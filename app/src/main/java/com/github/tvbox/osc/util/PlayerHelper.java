@@ -14,6 +14,7 @@ import org.json.JSONObject;
 
 import tv.danmaku.ijk.media.player.IjkLibLoader;
 import xyz.doikki.videoplayer.exo.ExoMediaPlayerFactory;
+import xyz.doikki.videoplayer.exo.ExoPlayerConfig;
 import xyz.doikki.videoplayer.player.AndroidMediaPlayerFactory;
 import xyz.doikki.videoplayer.player.PlayerFactory;
 import xyz.doikki.videoplayer.player.VideoView;
@@ -75,7 +76,7 @@ public class PlayerHelper {
     }
 
     /**
-     * 有声无画时按顺序尝试：Exo→IJK硬解→IJK软解→SurfaceView 渲染。
+     * 有声无画时按顺序尝试：SurfaceView → Exo软解 → IJK硬解 → IJK软解。
      *
      * @return 是否成功切换
      */
@@ -84,16 +85,31 @@ public class PlayerHelper {
             int playerType = playerCfg.optInt("pl", 2);
             int renderType = playerCfg.optInt("pr", 0);
             String ijkCode = playerCfg.optString("ijk", "硬解码");
+            boolean x86OnlyExo = !isIjkAvailable();
             switch (attempt) {
                 case 0:
-                    if (playerType == 2 && isIjkAvailable()) {
+                    if (renderType == 0) {
+                        playerCfg.put("pr", 1);
+                        updateCfg(videoView, playerCfg);
+                        return true;
+                    }
+                    break;
+                case 1:
+                    if (playerType == 2) {
+                        playerCfg.put("exo_sw", 1);
+                        updateCfg(videoView, playerCfg);
+                        return true;
+                    }
+                    break;
+                case 2:
+                    if (!x86OnlyExo && playerType == 2) {
                         playerCfg.put("pl", 1);
                         playerCfg.put("ijk", findIjkCodecName(true));
                         updateCfg(videoView, playerCfg);
                         return true;
                     }
                     break;
-                case 1:
+                case 3:
                     if (playerType == 1) {
                         String softName = findIjkCodecName(false);
                         if (!softName.equals(ijkCode)) {
@@ -101,13 +117,6 @@ public class PlayerHelper {
                             updateCfg(videoView, playerCfg);
                             return true;
                         }
-                    }
-                    break;
-                case 2:
-                    if (renderType == 0) {
-                        playerCfg.put("pr", 1);
-                        updateCfg(videoView, playerCfg);
-                        return true;
                     }
                     break;
                 default:
@@ -122,11 +131,13 @@ public class PlayerHelper {
     public static String getBlackScreenFallbackTip(int attempt) {
         switch (attempt) {
             case 0:
-                return "检测到黑屏，已切换IJK硬解码";
-            case 1:
-                return "检测到黑屏，已切换IJK软解码";
-            case 2:
                 return "检测到黑屏，已切换SurfaceView渲染";
+            case 1:
+                return "检测到黑屏，已切换Exo软解码";
+            case 2:
+                return "检测到黑屏，已切换IJK硬解码";
+            case 3:
+                return "检测到黑屏，已切换IJK软解码";
             default:
                 return "播放异常";
         }
@@ -153,9 +164,40 @@ public class PlayerHelper {
         return soft != null ? soft : (hard != null ? hard : (first != null ? first : "软解码"));
     }
 
+    /** x86 模拟器默认 SurfaceView，避免 TextureView 黑屏 */
+    public static int getDefaultRenderType() {
+        if (isX86Device()) {
+            return 1;
+        }
+        return Hawk.get(HawkConfig.PLAY_RENDER, 0);
+    }
+
+    public static void applyExoPlayerConfig() {
+        applyExoPlayerConfig(false);
+    }
+
+    public static void applyExoPlayerConfig(boolean forceSoftwareDecoder) {
+        applyExoPlayerConfig(forceSoftwareDecoder, true);
+    }
+
+    public static void applyExoPlayerConfig(boolean forceSoftwareDecoder, boolean surfaceRender) {
+        int bufferSec = Hawk.get(HawkConfig.EXO_BUFFER, 20);
+        boolean cache = Hawk.get(HawkConfig.EXO_CACHE, true);
+        boolean tunnel = Hawk.get(HawkConfig.EXO_TUNNEL, true) && surfaceRender;
+        boolean software = forceSoftwareDecoder || isX86Device();
+        ExoPlayerConfig.apply(bufferSec, cache, software, tunnel);
+    }
+
+    private static void applyExoPlayerConfig(JSONObject playerCfg) {
+        boolean forceSoft = playerCfg != null && playerCfg.optInt("exo_sw", 0) == 1;
+        int renderType = playerCfg != null ? playerCfg.optInt("pr", getDefaultRenderType()) : getDefaultRenderType();
+        applyExoPlayerConfig(forceSoft, renderType == 1);
+    }
+
     public static void updateCfg(VideoView videoView, JSONObject playerCfg) {
+        applyExoPlayerConfig(playerCfg);
         int playerType = resolvePlayType(Hawk.get(HawkConfig.PLAY_TYPE, 0));
-        int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
+        int renderType = getDefaultRenderType();
         String ijkCode = Hawk.get(HawkConfig.IJK_CODEC, "软解码");
         int scale = Hawk.get(HawkConfig.PLAY_SCALE, 0);
         try {
@@ -218,6 +260,7 @@ public class PlayerHelper {
     }
 
     public static void updateCfg(VideoView videoView) {
+        applyExoPlayerConfig(false, getDefaultRenderType() == 1);
         int playType = resolvePlayType(Hawk.get(HawkConfig.PLAY_TYPE, 0));
         PlayerFactory playerFactory;
         if (playType == 1) {
@@ -246,7 +289,7 @@ public class PlayerHelper {
         } else {
             playerFactory = AndroidMediaPlayerFactory.create();
         }
-        int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
+        int renderType = getDefaultRenderType();
         RenderViewFactory renderViewFactory = null;
         switch (renderType) {
             case 0:

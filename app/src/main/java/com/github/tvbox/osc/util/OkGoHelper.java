@@ -46,9 +46,9 @@ public class OkGoHelper {
         builder.retryOnConnectionFailure(true);
         builder.followRedirects(true);
         builder.followSslRedirects(true);
-        builder.readTimeout(60, TimeUnit.SECONDS);
-        builder.writeTimeout(30, TimeUnit.SECONDS);
         builder.connectTimeout(15, TimeUnit.SECONDS);
+        builder.readTimeout(120, TimeUnit.SECONDS);
+        builder.writeTimeout(30, TimeUnit.SECONDS);
 
 
         try {
@@ -59,6 +59,7 @@ public class OkGoHelper {
         builder.dns(dnsOverHttps);
 
         ExoMediaSourceHelper.getInstance(App.getInstance()).setOkClient(builder.build());
+        PlayerHelper.applyExoPlayerConfig();
     }
 
     public static DnsOverHttps dnsOverHttps = null;
