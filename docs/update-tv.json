@@ -3,5 +3,5 @@
   "versionName": "1.0.13",
   "apkUrl": "https://gh-proxy.com/https://github.com/stlxing1987/dhmtv/releases/download/v1.0.13-tv/app-tv.apk",
   "forceUpdate": false,
-  "changelog": "优化外部播放器国内下载镜像（Gitee/gh-proxy 多线路）；播放器列表始终显示全部选项"
+  "changelog": "release: TV 1.0.13 \u4f18\u5316\u5916\u90e8\u64ad\u653e\u5668\u56fd\u5185\u4e0b\u8f7d\u4e0e\u64ad\u653e\u5668\u5217\u8868\u5c55\u793a\n\nReex \u4f18\u5148 Gitee \u76f4\u94fe\u3001MX \u8d70 gh-proxy \u591a\u955c\u50cf\u81ea\u52a8\u5207\u6362\uff1b\u64ad\u653e\u5668\u5f39\u7a97\u56fa\u5b9a\u663e\u793a\u5168\u90e8\u9009\u9879\uff0c\u672a\u5b89\u88c5\u5916\u90e8\u64ad\u653e\u5668\u65f6\u53ef\u9009\u62e9\u4e0b\u8f7d\u5b89\u88c5\u3002\n\nCo-authored-by: Cursor <cursoragent@cursor.com>"
 }
